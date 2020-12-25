@@ -1,0 +1,359 @@
+playerWidth = 23
+playerHeight = 32
+blockSize = 32
+heightMultiplier = 10
+widthMultiplier = 15
+
+GraphicsWindow.Width = blockSize * widthMultiplier - 10
+GraphicsWindow.Height = blockSize * heightMultiplier - 10
+GraphicsWindow.CanResize = "False"
+GraphicsWindow.Title = "Mario Game"
+GraphicsWindow.KeyDown = OnKeyDown
+GraphicsWindow.KeyUp = OnKeyUp
+
+playerIdleRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle right.png")
+playerIdleLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle left.png")
+playerWalkingRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking right.png")
+playerWalkingLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left.png")
+playerInAirRight = ImageList.LoadImage(Program.Directory + "\mario sprites\In air right.png")
+playerInAirLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\In air left.png")
+tile1 = ImageList.LoadImage(Program.Directory + "\tiles\1.png")
+tile2 = ImageList.LoadImage(Program.Directory + "\tiles\2.png")
+tile3 = ImageList.LoadImage(Program.Directory + "\tiles\3.png")
+tile4 = ImageList.LoadImage(Program.Directory + "\tiles\4.png")
+tile5 = ImageList.LoadImage(Program.Directory + "\tiles\5.png")
+tile6 = ImageList.LoadImage(Program.Directory + "\tiles\6.png")
+tile7 = ImageList.LoadImage(Program.Directory + "\tiles\7.png")
+gh = GraphicsWindow.Height
+gw = GraphicsWindow.Width
+
+startGame:
+
+GraphicsWindow.Clear()
+keyboard["Left"] = 0
+keyboard["Right"] = 0
+keyboard["Up"] = 0
+blocks = ""
+blockShapes = ""
+player = ""
+velocity = 0
+inAir = 0
+moveSpeed = 10
+position = 0
+movmentExceleration = 0
+exceleration = 15
+lastMovedX = 1
+frames = 0
+walkingAnimationType = 1
+
+' 1 = playerIdleRight, 2 = playerIdleLeft, 3 = playerWalkingRight, 4 = playerWalkingLeft, 5 = playerInAirRight, 6 = playerInAirLeft
+lastPlayerSprite = 1
+
+SetupBlocks()
+LoadFirstScreen()
+DrawPlayer()
+
+While "True"
+  start = Clock.ElapsedMilliseconds
+  
+  playerLeft = Shapes.GetLeft(player)
+  playerRight = playerLeft + playerWidth
+  playerTop = Shapes.GetTop(player)
+  playerBottom = playerTop + playerHeight
+  
+  If playerTop >= gh Then
+    excelerationTypeY = 0
+    Shapes.Move(player, -blockSize, -blockSize)
+    
+    GraphicsWindow.ShowMessage("You fell out of the world", "Game End")
+    Goto startGame
+  EndIf
+  
+  hitBlockLeft = 0
+  hitBlockRight = 0
+  hitBlockTop = 0
+  hitBlockBottom = 0
+  
+  ' Проверяваме дали играча докосва някакъв блок
+  For h = 1 To Array.GetItemCount(blocks)
+    For w = 1 To Array.GetItemCount(blocks[h])
+      If blocks[h][w] <> "0" Then
+        blockLeft = Shapes.GetLeft(blockShapes[h][w])
+        blockRight = blockLeft + blockSize
+        blockTop = Shapes.GetTop(blockShapes[h][w])
+        blockBottom = blockTop + blockSize
+        ' Ако блока не е на екрана, няма смисъл да го проверявам
+        If blockLeft > 0 And blockLeft < gw Then
+          ' Провери дали блока се удря
+          If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
+            ' Проверка дали блока се удря от дясно
+            If playerLeft > blockRight - moveSpeed And playerLeft <= blockRight And playerTop < blockBottom And playerBottom > blockTop Then
+              Shapes.Move(player, blockRight, playerTop)
+              playerLeft = Shapes.GetLeft(player)
+              playerRight = playerLeft + playerWidth
+              hitBlockLeft = 1
+            ' Проверка дали блока се удря от ляво
+            ElseIf playerRight >= blockLeft And playerRight < blockLeft + moveSpeed And playerTop < blockBottom And playerBottom > blockTop Then
+              Shapes.Move(player, blockLeft - playerWidth, playerTop)
+              playerLeft = Shapes.GetLeft(player)
+              playerRight = playerLeft + playerWidth
+              hitBlockRight = 1
+            EndIf
+            ' Провери дали блока се удря от долу
+            If playerTop > blockBottom - moveSpeed * 2 And playerTop - 1 < blockBottom And playerRight > blockLeft And playerLeft < blockRight Then
+              Shapes.Move(player, playerLeft, blockBottom)
+              playerTop = Shapes.GetTop(player)
+              playerBottom = playerTop + playerHeight
+              hitBlockTop = 1
+              If inAir = 1 Then
+                velocity = -1
+              EndIf
+            ' Проверка дали блока се удря от горе
+            ElseIf playerBottom > blockTop - 1 And playerBottom < blockTop + moveSpeed * 2 And playerRight > blockLeft And playerLeft < blockRight Then
+              Shapes.Move(player, playerLeft, blockTop - playerHeight)
+              playerTop = Shapes.GetTop(player)
+              playerBottom = playerTop + playerHeight
+              hitBlockBottom = 1
+              SetNotInAir()
+              velocity = 0
+            EndIf
+          EndIf
+        EndIf
+      EndIf
+    EndFor
+  EndFor
+  
+  playerLeft = Shapes.GetLeft(player)
+  playerRight = playerLeft + blockSize
+  playerTop = Shapes.GetTop(player)
+  playerBottom = playerTop + blockSize
+  
+  ' Провери дали пада играча, ако не във въздуха вече
+  If hitBlockBottom = 0 And inAir = 0 Then
+    SetInAir()
+    velocity = -1
+  EndIf
+  
+  If keyboard["Up"] = 1 And inAir = 0 And hitBlockTop = 0 Then
+    SetInAir()
+    velocity = exceleration
+  EndIf
+  
+  ' Премести го ако пада
+  If inAir = 1 Then
+    If keyboard["Left"] = 1 Then
+      If lastPlayerSprite <> 6 Then
+        lastPlayerSprite = 6
+        Shapes.Remove(player)
+        player = Shapes.AddImage(playerInAirLeft)
+      EndIf
+    ElseIf lastPlayerSprite <> 5 Then
+      lastPlayerSprite = 5
+      Shapes.Remove(player)
+      player = Shapes.AddImage(playerInAirRight)
+    EndIf
+    Shapes.Move(player, playerLeft, playerTop - velocity)
+    playerTop = Shapes.GetTop(player)
+    playerBottom = playerTop + playerHeight
+    
+    If velocity >= -moveSpeed Then
+      velocity = velocity - 1
+    EndIf
+  EndIf
+  
+  ' Премести ако се движи на дясто
+  If keyboard["Right"] = 1 And hitBlockRight = 0 Then
+    If lastMovedX <> 1 Then
+      movmentExceleration = 1
+    EndIf
+    lastMovedX = 1
+    
+    If movmentExceleration <= moveSpeed Then
+      movmentExceleration = movmentExceleration + 0.4
+    EndIf
+    
+    If inAir = 0 And (Math.Remainder(frames, 4) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
+      lastPlayerSprite = 3
+      Shapes.Remove(player)
+      If walkingAnimationType = 0 Then
+        player = Shapes.AddImage(playerWalkingRight)
+        walkingAnimationType = 1
+      Else
+        player = Shapes.AddImage(playerIdleRight)
+        walkingAnimationType = 0
+      EndIf
+      Shapes.Move(player, playerLeft, playerTop)
+    EndIf
+    
+    For h = 1 To Array.GetItemCount(blocks)
+      For w = 1 To Array.GetItemCount(blocks[h])
+        If blocks[h][w] <> "0" Then
+          blockLeft = Shapes.GetLeft(blockShapes[h][w])
+          blockTop = Shapes.GetTop(blockShapes[h][w])
+          Shapes.Move(blockShapes[h][w], blockLeft - movmentExceleration, blockTop)
+        EndIf
+      EndFor
+    EndFor
+    position = position + movmentExceleration
+  ' Премести ако се движи на ляво
+  ElseIf keyboard["Left"] = 1 And hitBlockLeft = 0 Then
+    If lastMovedX <> 2 Then
+      movmentExceleration = 1
+    EndIf
+    lastMovedX = 2
+    
+    If movmentExceleration <= moveSpeed Then
+      movmentExceleration = movmentExceleration + 0.4
+    EndIf
+    
+    If inAir = 0 And (Math.Remainder(frames, 4) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
+      lastPlayerSprite = 4
+      Shapes.Remove(player)
+      If walkingAnimationType = 0 Then
+        player = Shapes.AddImage(playerWalkingLeft)
+        walkingAnimationType = 1
+      Else
+        player = Shapes.AddImage(playerIdleLeft)
+        walkingAnimationType = 0
+      EndIf
+      Shapes.Move(player, playerLeft, playerTop)
+    EndIf
+    
+    For h = 1 To Array.GetItemCount(blocks)
+      For w = 1 To Array.GetItemCount(blocks[h])
+        If blocks[h][w] <> "0" Then
+          blockLeft = Shapes.GetLeft(blockShapes[h][w])
+          blockTop = Shapes.GetTop(blockShapes[h][w])
+          Shapes.Move(blockShapes[h][w], blockLeft + movmentExceleration, blockTop)
+        EndIf
+      EndFor
+    EndFor
+    position = position - movmentExceleration
+  EndIf
+  
+  ' Играта върви с 50 fps
+  delay = 20 - (Clock.ElapsedMilliseconds - start)
+  If (delay > 0) Then
+    Program.Delay(delay)
+  EndIf
+  
+  frames = frames + 1
+  If frames = 51 Then
+    frames = 0
+  EndIf
+EndWhile
+
+Sub SetInAir
+  inAir = 1
+  
+  ' Променяме картинката на играча да е във въздуха
+  If keyboard["Left"] = 1 Then
+    If lastPlayerSprite <> 6 Then
+      lastPlayerSprite = 6
+      playerLeft = Shapes.GetLeft(player)
+      playerTop = Shapes.GetTop(player)
+      Shapes.Remove(player)
+      player = Shapes.AddImage(playerInAirLeft)
+      Shapes.Move(player, playerLeft, playerTop)
+    EndIf
+  ElseIf lastPlayerSprite <> 5 Then
+    lastPlayerSprite = 5
+    playerLeft = Shapes.GetLeft(player)
+    playerTop = Shapes.GetTop(player)
+    Shapes.Remove(player)
+    player = Shapes.AddImage(playerInAirRight)
+    Shapes.Move(player, playerLeft, playerTop)
+  EndIf
+EndSub
+
+Sub SetNotInAir
+  inAir = 0
+  
+  ' Променяме картинката на играча да е на земята
+  If keyboard["Right"] = 0 And lastMovedX = 1 Then
+    If lastPlayerSprite <> 1 Then
+      lastPlayerSprite = 1
+      playerLeft = Shapes.GetLeft(player)
+      playerTop = Shapes.GetTop(player)
+      Shapes.Remove(player)
+      player = Shapes.AddImage(playerIdleRight)
+      Shapes.Move(player, playerLeft, playerTop)
+    EndIf
+  ElseIf keyboard["Left"] = 0 And lastMovedX = 2 Then
+    If lastPlayerSprite <> 2 Then
+      lastPlayerSprite = 2
+      playerLeft = Shapes.GetLeft(player)
+      playerTop = Shapes.GetTop(player)
+      Shapes.Remove(player)
+      player = Shapes.AddImage(playerIdleLeft)
+      Shapes.Move(player, playerLeft, playerTop)
+    EndIf
+  EndIf
+EndSub
+
+Sub SetupBlocks
+  path = Program.Directory + "\levels\level_1.txt"
+  i = 1
+  line = File.ReadLine(path, i)
+  While line <> ""
+    While (line <> "")
+      val = Text.GetSubText(line, 1, 1)
+      line = Text.GetSubTextToEnd(line, 2)
+      itemCount = Array.GetItemCount(blocks[i]) + 1
+      blocks[i][itemCount] = val
+    EndWhile
+    itemCount = Array.GetItemCount(blocks[i]) + 1
+    i = i + 1
+    line = File.ReadLine(path, i)
+  EndWhile
+EndSub
+
+Sub LoadFirstScreen
+  backgroundOverworld = ImageList.LoadImage(Program.Directory + "\backgrounds\background_overworld.jpg")
+  GraphicsWindow.DrawResizedImage(backgroundOverworld, 0, 0, gw, gh)
+  For h = 1 To Array.GetItemCount(blocks)
+    For w = 1 To Array.GetItemCount(blocks[h])
+      If blocks[h][w] = "1" Then
+        blockShapes[h][w] = Shapes.AddImage(tile1)
+      ElseIf blocks[h][w] = "2" Then
+        blockShapes[h][w] = Shapes.AddImage(tile2)
+      ElseIf blocks[h][w] = "3" Then
+        blockShapes[h][w] = Shapes.AddImage(tile3)
+      ElseIf blocks[h][w] = "4" Then
+        blockShapes[h][w] = Shapes.AddImage(tile4)
+      ElseIf blocks[h][w] = "5" Then
+        blockShapes[h][w] = Shapes.AddImage(tile5)
+      ElseIf blocks[h][w] = "6" Then
+        blockShapes[h][w] = Shapes.AddImage(tile6)
+      ElseIf blocks[h][w] = "7" Then
+        blockShapes[h][w] = Shapes.AddImage(tile7)
+      EndIf
+      Shapes.Move(blockShapes[h][w], w * blockSize - blockSize, h * blockSize - blockSize)
+    EndFor
+  EndFor
+EndSub
+
+Sub DrawPlayer
+  player = Shapes.AddImage(playerIdleRight)
+  Shapes.Move(player, gw / 2, gh - blockSize * 2 - 1)
+EndSub
+
+Sub OnKeyDown
+  If GraphicsWindow.LastKey = "Left" Or GraphicsWindow.LastKey = "A" Then
+    keyboard["Left"] = 1
+  ElseIf GraphicsWindow.LastKey = "Right" Or GraphicsWindow.LastKey = "D" Then
+    keyboard["Right"] = 1
+  ElseIf GraphicsWindow.LastKey = "Up" Or GraphicsWindow.LastKey = "W" Or GraphicsWindow.LastKey = "Space" Then
+    keyboard["Up"] = 1
+  EndIf
+EndSub
+
+Sub OnKeyUp
+  If GraphicsWindow.LastKey = "Left" Or GraphicsWindow.LastKey = "A" Then
+    keyboard["Left"] = 0
+  ElseIf GraphicsWindow.LastKey = "Right" Or GraphicsWindow.LastKey = "D" Then
+    keyboard["Right"] = 0
+  ElseIf GraphicsWindow.LastKey = "Up" Or GraphicsWindow.LastKey = "W" Or GraphicsWindow.LastKey = "Space" Then
+    keyboard["Up"] = 0
+  EndIf
+EndSub
