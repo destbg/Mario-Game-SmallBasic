@@ -4,6 +4,7 @@ blockSize = 32
 heightMultiplier = 10
 widthMultiplier = 15
 
+GraphicsWindow.BrushColor = "White"
 GraphicsWindow.Width = blockSize * widthMultiplier - 10
 GraphicsWindow.Height = blockSize * heightMultiplier - 10
 GraphicsWindow.CanResize = "False"
@@ -33,18 +34,25 @@ GraphicsWindow.Clear()
 keyboard["Left"] = 0
 keyboard["Right"] = 0
 keyboard["Up"] = 0
+levelPath = Program.Directory + "\levels\level_1.txt"
 blocks = ""
+enemies = ""
+enemyShapes = ""
 blockShapes = ""
 player = ""
 velocity = 0
 inAir = 0
-moveSpeed = 10
+moveSpeed = 5
 position = 0
 movmentExceleration = 0
-exceleration = 15
+exceleration = 10
 lastMovedX = 1
 frames = 0
 walkingAnimationType = 1
+hitBlockLeft = 0
+hitBlockRight = 0
+hitBlockTop = 0
+hitBlockBottom = 0
 
 ' 1 = playerIdleRight, 2 = playerIdleLeft, 3 = playerWalkingRight, 4 = playerWalkingLeft, 5 = playerInAirRight, 6 = playerInAirLeft
 lastPlayerSprite = 1
@@ -52,6 +60,9 @@ lastPlayerSprite = 1
 SetupBlocks()
 LoadFirstScreen()
 DrawPlayer()
+
+frameCount = Clock.ElapsedMilliseconds
+framesSinceLastCount = 0
 
 While "True"
   start = Clock.ElapsedMilliseconds
@@ -61,11 +72,9 @@ While "True"
   playerTop = Shapes.GetTop(player)
   playerBottom = playerTop + playerHeight
   
-  If playerTop >= gh Then
-    excelerationTypeY = 0
-    Shapes.Move(player, -blockSize, -blockSize)
-    
-    GraphicsWindow.ShowMessage("You fell out of the world", "Game End")
+  If playerTop >= Array.GetItemCount(blocks) * blockSize Then
+    Shapes.Move(player, -playerWidth, -playerHeight)
+    GraphicsWindow.ShowMessage("Падна от света", "Край на играта")
     Goto startGame
   EndIf
   
@@ -73,6 +82,20 @@ While "True"
   hitBlockRight = 0
   hitBlockTop = 0
   hitBlockBottom = 0
+  
+  ' Проверка дали се удряш с някой противник
+  For i = 1 To Array.GetItemCount(enemyShapes)
+    enemyLeft = Shapes.GetLeft(enemyShapes[i])
+    enemyRight = enemyLeft + enemies[i]["width"]
+    enemyTop = Shapes.GetTop(enemyShapes[i])
+    enemyBottom = enemyTop + enemies[i]["height"]
+    
+    If playerRight >= enemyLeft And playerLeft <= enemyRight And playerTop <= enemyBottom And playerBottom >= enemyTop Then
+      Shapes.Move(player, -playerWidth, -playerHeight)
+      GraphicsWindow.ShowMessage("Беше убит от противник", "Край на играта")
+      Goto startGame
+    EndIf
+  EndFor
   
   ' Проверяваме дали играча докосва някакъв блок
   For h = 1 To Array.GetItemCount(blocks)
@@ -87,7 +110,7 @@ While "True"
           ' Провери дали блока се удря
           If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
             ' Проверка дали блока се удря от дясно
-            If playerLeft > blockRight - moveSpeed And playerLeft <= blockRight And playerTop < blockBottom And playerBottom > blockTop Then
+            If playerLeft > blockRight - moveSpeed And playerLeft <= blockRight And playerTop < blockBottom And playerBottom > blockTop + moveSpeed * 2 Then
               Shapes.Move(player, blockRight, playerTop)
               playerLeft = Shapes.GetLeft(player)
               playerRight = playerLeft + playerWidth
@@ -123,6 +146,33 @@ While "True"
     EndFor
   EndFor
   
+  MovePlayer()
+  MoveEnemies()
+  
+  If Clock.ElapsedMilliseconds - frameCount >= 1000 Then
+    GraphicsWindow.BrushColor = "Black"
+    GraphicsWindow.FillRectangle(0, 0, 50, 25)
+    GraphicsWindow.BrushColor = "White"
+    GraphicsWindow.DrawText(5, 5, framesSinceLastCount + " fps")
+    frameCount = Clock.ElapsedMilliseconds
+    framesSinceLastCount = 0
+  Else
+    framesSinceLastCount = framesSinceLastCount + 1
+  EndIf
+  
+  ' Играта върви с 60 fps
+  delay = 10 - (Clock.ElapsedMilliseconds - start)
+  If (delay > 0) Then
+    Program.Delay(delay)
+  EndIf
+  
+  frames = frames + 1
+  If frames = 61 Then
+    frames = 0
+  EndIf
+EndWhile
+
+Sub MovePlayer
   playerLeft = Shapes.GetLeft(player)
   playerRight = playerLeft + blockSize
   playerTop = Shapes.GetTop(player)
@@ -157,7 +207,7 @@ While "True"
     playerBottom = playerTop + playerHeight
     
     If velocity >= -moveSpeed Then
-      velocity = velocity - 1
+      velocity = velocity - 0.5
     EndIf
   EndIf
   
@@ -169,10 +219,10 @@ While "True"
     lastMovedX = 1
     
     If movmentExceleration <= moveSpeed Then
-      movmentExceleration = movmentExceleration + 0.4
+      movmentExceleration = movmentExceleration + 0.1
     EndIf
     
-    If inAir = 0 And (Math.Remainder(frames, 4) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
+    If inAir = 0 And (Math.Remainder(frames, 8) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
       lastPlayerSprite = 3
       Shapes.Remove(player)
       If walkingAnimationType = 0 Then
@@ -185,15 +235,7 @@ While "True"
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
     
-    For h = 1 To Array.GetItemCount(blocks)
-      For w = 1 To Array.GetItemCount(blocks[h])
-        If blocks[h][w] <> "0" Then
-          blockLeft = Shapes.GetLeft(blockShapes[h][w])
-          blockTop = Shapes.GetTop(blockShapes[h][w])
-          Shapes.Move(blockShapes[h][w], blockLeft - movmentExceleration, blockTop)
-        EndIf
-      EndFor
-    EndFor
+    MoveLevelRight()
     position = position + movmentExceleration
   ' Премести ако се движи на ляво
   ElseIf keyboard["Left"] = 1 And hitBlockLeft = 0 Then
@@ -203,10 +245,10 @@ While "True"
     lastMovedX = 2
     
     If movmentExceleration <= moveSpeed Then
-      movmentExceleration = movmentExceleration + 0.4
+      movmentExceleration = movmentExceleration + 0.1
     EndIf
     
-    If inAir = 0 And (Math.Remainder(frames, 4) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
+    If inAir = 0 And (Math.Remainder(frames, 8) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
       lastPlayerSprite = 4
       Shapes.Remove(player)
       If walkingAnimationType = 0 Then
@@ -219,29 +261,107 @@ While "True"
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
     
+    MoveLevelLeft()
+    position = position - movmentExceleration
+  ' Ако не се движи в нито една посока тогава му премахни натрупаната бързина
+  Else
+    movmentExceleration = 1
+  EndIf
+EndSub
+
+Sub MoveEnemies
+  For i = 1 To Array.GetItemCount(enemyShapes)
+    enemyLeft = Shapes.GetLeft(enemyShapes[i])
+    enemyRight = enemyLeft + enemies[i]["width"]
+    enemyTop = Shapes.GetTop(enemyShapes[i])
+    enemyBottom = enemyTop + enemies[i]["height"]
+    
+    If enemyTop >= Array.GetItemCount(blocks) * blockSize Then
+      Shapes.Remove(enemyShapes[i])
+    EndIf
+    
+    enemyHitBlockBottom = 0
+    
+    ' Проверяваме дали противника докосва някакъв блок
     For h = 1 To Array.GetItemCount(blocks)
       For w = 1 To Array.GetItemCount(blocks[h])
         If blocks[h][w] <> "0" Then
           blockLeft = Shapes.GetLeft(blockShapes[h][w])
+          blockRight = blockLeft + blockSize
           blockTop = Shapes.GetTop(blockShapes[h][w])
-          Shapes.Move(blockShapes[h][w], blockLeft + movmentExceleration, blockTop)
+          blockBottom = blockTop + blockSize
+          ' Провери дали блока се удря
+          If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
+            ' Проверка дали блока се удря от дясно
+            If (enemyRight >= blockLeft And enemyRight < blockLeft + 5 Or enemyLeft > blockRight - 5 And enemyLeft <= blockRight) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
+              If enemies[i]["facing"] = 1 Then
+                enemies[i]["facing"] = 0
+              Else
+                enemies[i]["facing"] = 1
+              EndIf
+            EndIf
+            ' Провери дали блока се удря от долу
+            If enemyTop > blockBottom - 1 And enemyTop < blockBottom And enemyRight > blockLeft And enemyLeft < blockRight Then
+              enemies[i]["velocity"] = 1
+            ' Проверка дали блока се удря от горе
+            ElseIf enemyBottom > blockTop - 5 And enemyBottom < blockTop + 5 And enemyRight > blockLeft And enemyLeft < blockRight Then
+              enemies[i]["velocity"] = 0
+              enemyHitBlockBottom = 1
+            EndIf
+          EndIf
         EndIf
       EndFor
     EndFor
-    position = position - movmentExceleration
-  EndIf
-  
-  ' Играта върви с 50 fps
-  delay = 20 - (Clock.ElapsedMilliseconds - start)
-  If (delay > 0) Then
-    Program.Delay(delay)
-  EndIf
-  
-  frames = frames + 1
-  If frames = 51 Then
-    frames = 0
-  EndIf
-EndWhile
+    
+    If enemyHitBlockBottom = 0 Then
+      enemies[i]["velocity"] = 1
+    EndIf
+    
+    If enemies[i]["facing"] = 1 Then
+      Shapes.Move(enemyShapes[i], enemyLeft + 1, enemyTop + enemies[i]["velocity"])
+    Else
+      Shapes.Move(enemyShapes[i], enemyLeft - 1, enemyTop + enemies[i]["velocity"])
+    EndIf
+  EndFor
+EndSub
+
+Sub MoveLevelRight
+  ' Премести всички блокове
+  For h = 1 To Array.GetItemCount(blocks)
+    For w = 1 To Array.GetItemCount(blocks[h])
+      If blocks[h][w] <> "0" Then
+        blockLeft = Shapes.GetLeft(blockShapes[h][w])
+        blockTop = Shapes.GetTop(blockShapes[h][w])
+        Shapes.Move(blockShapes[h][w], blockLeft - movmentExceleration, blockTop)
+      EndIf
+    EndFor
+  EndFor
+  ' Премести всички противници
+  For i = 1 To Array.GetItemCount(enemyShapes)
+    enemyLeft = Shapes.GetLeft(enemyShapes[i])
+    enemyTop = Shapes.GetTop(enemyShapes[i])
+    Shapes.Move(enemyShapes[i], enemyLeft - movmentExceleration, enemyTop)
+  EndFor
+EndSub
+
+Sub MoveLevelLeft
+  ' Премести всички блокове
+  For h = 1 To Array.GetItemCount(blocks)
+    For w = 1 To Array.GetItemCount(blocks[h])
+      If blocks[h][w] <> "0" Then
+        blockLeft = Shapes.GetLeft(blockShapes[h][w])
+        blockTop = Shapes.GetTop(blockShapes[h][w])
+        Shapes.Move(blockShapes[h][w], blockLeft + movmentExceleration, blockTop)
+      EndIf
+    EndFor
+  EndFor
+  ' Премести всички противници
+  For i = 1 To Array.GetItemCount(enemyShapes)
+    enemyLeft = Shapes.GetLeft(enemyShapes[i])
+    enemyTop = Shapes.GetTop(enemyShapes[i])
+    Shapes.Move(enemyShapes[i], enemyLeft + movmentExceleration, enemyTop)
+  EndFor
+EndSub
 
 Sub SetInAir
   inAir = 1
@@ -292,25 +412,55 @@ Sub SetNotInAir
 EndSub
 
 Sub SetupBlocks
-  path = Program.Directory + "\levels\level_1.txt"
   i = 1
-  line = File.ReadLine(path, i)
+  line = File.ReadLine(levelPath, i)
+  scanType = 1
   While line <> ""
-    While (line <> "")
-      val = Text.GetSubText(line, 1, 1)
-      line = Text.GetSubTextToEnd(line, 2)
-      itemCount = Array.GetItemCount(blocks[i]) + 1
-      blocks[i][itemCount] = val
-    EndWhile
-    itemCount = Array.GetItemCount(blocks[i]) + 1
+    If line = "///" Then
+      scanType = scanType + 1
+    EndIf
+    
+    ' Взимаме информацията за блоковете в нивото
+    If scanType = 1 Then
+      While line <> ""
+        val = Text.GetSubText(line, 1, 1)
+        line = Text.GetSubTextToEnd(line, 2)
+        itemCount = Array.GetItemCount(blocks[i]) + 1
+        blocks[i][itemCount] = val
+      EndWhile
+    ' Взимаме информацията  за противниците в нивото
+    ElseIf scanType = 2 Then
+      itemCount = Array.GetItemCount(enemies[i]) + 1
+    
+      indexOf = Text.GetIndexOf(line, " ")
+      val = Text.GetSubText(line, 1, indexOf)
+      line = Text.GetSubTextToEnd(line, indexOf + 1)
+      enemies[itemCount]["top"] = val
+      
+      indexOf = Text.GetIndexOf(line, " ")
+      val = Text.GetSubText(line, 1, indexOf)
+      line = Text.GetSubTextToEnd(line, indexOf + 1)
+      enemies[itemCount]["left"] = val
+      
+      indexOf = Text.GetIndexOf(line, " ")
+      val = Text.GetSubText(line, 1, indexOf)
+      line = Text.GetSubTextToEnd(line, indexOf + 1)
+      enemies[itemCount]["facing"] = val
+      
+      enemies[itemCount]["type"] = line
+    EndIf
+    
     i = i + 1
-    line = File.ReadLine(path, i)
+    line = File.ReadLine(levelPath, i)
   EndWhile
 EndSub
 
 Sub LoadFirstScreen
+  ' Зареди снимката от зад
   backgroundOverworld = ImageList.LoadImage(Program.Directory + "\backgrounds\background_overworld.jpg")
   GraphicsWindow.DrawResizedImage(backgroundOverworld, 0, 0, gw, gh)
+  
+  ' Зареди блоковете
   For h = 1 To Array.GetItemCount(blocks)
     For w = 1 To Array.GetItemCount(blocks[h])
       If blocks[h][w] = "1" Then
@@ -330,6 +480,17 @@ Sub LoadFirstScreen
       EndIf
       Shapes.Move(blockShapes[h][w], w * blockSize - blockSize, h * blockSize - blockSize)
     EndFor
+  EndFor
+  
+  ' Постави противниците
+  For i = 1 To Array.GetItemCount(enemies)
+    If enemies[i]["type"] = 1 Then
+      enemyShapes[i] = Shapes.AddRectangle(blockSize, blockSize)
+      enemies[i]["width"] = blockSize
+      enemies[i]["height"] = blockSize
+    EndIf
+    Shapes.Move(enemyShapes[i], enemies[i]["left"] * blockSize - blockSize + 1, enemies[i]["top"] * blockSize - blockSize - 1)
+    enemies[i]["velocity"] = 0
   EndFor
 EndSub
 
