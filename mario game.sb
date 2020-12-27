@@ -1,10 +1,9 @@
-playerWidth = 23
-playerHeight = 32
-blockSize = 32
+playerWidth = 64
+playerHeight = 64
+blockSize = 64
 heightMultiplier = 10
 widthMultiplier = 15
 
-GraphicsWindow.BrushColor = "White"
 GraphicsWindow.Width = blockSize * widthMultiplier - 10
 GraphicsWindow.Height = blockSize * heightMultiplier - 10
 GraphicsWindow.CanResize = "False"
@@ -15,21 +14,33 @@ GraphicsWindow.KeyUp = OnKeyUp
 playerIdleRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle right.png")
 playerIdleLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle left.png")
 playerWalkingRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking right.png")
-playerWalkingLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left.png")
+playerWalkingRight2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking right 2.png")
+playerWalkingLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left 2.png")
+playerWalkingLeft2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left.png")
 playerInAirRight = ImageList.LoadImage(Program.Directory + "\mario sprites\In air right.png")
 playerInAirLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\In air left.png")
-tile1 = ImageList.LoadImage(Program.Directory + "\tiles\1.png")
-tile2 = ImageList.LoadImage(Program.Directory + "\tiles\2.png")
-tile3 = ImageList.LoadImage(Program.Directory + "\tiles\3.png")
-tile4 = ImageList.LoadImage(Program.Directory + "\tiles\4.png")
-tile5 = ImageList.LoadImage(Program.Directory + "\tiles\5.png")
-tile6 = ImageList.LoadImage(Program.Directory + "\tiles\6.png")
-tile7 = ImageList.LoadImage(Program.Directory + "\tiles\7.png")
+enemy1_1 = ImageList.LoadImage(Program.Directory + "\enemy sprites\Enemy 1 1.png")
+enemy1_2 = ImageList.LoadImage(Program.Directory + "\enemy sprites\Enemy 1 2.png")
+imageFiles = File.GetFiles(Program.Directory + "\tiles")
+For i = 1 To Array.GetItemCount(imageFiles)
+  imagePath = imageFiles[i]
+  pos = Text.GetIndexOf(imagePath, "\")
+  While pos > 0
+    imagePath = Text.GetSubTextToEnd(imagePath, pos + 1)
+    pos = Text.GetIndexOf(imagePath, "\")
+  EndWhile
+  
+  tiles[Text.GetSubText(imagePath, 1, 1)] = ImageList.LoadImage(imageFiles[i])
+EndFor
 gh = GraphicsWindow.Height
 gw = GraphicsWindow.Width
 
+Timer.Interval = 1000
+Timer.Tick = OnTick
+
 startGame:
 
+GraphicsWindow.BrushColor = "White"
 GraphicsWindow.Clear()
 keyboard["Left"] = 0
 keyboard["Right"] = 0
@@ -40,12 +51,17 @@ enemies = ""
 enemyShapes = ""
 blockShapes = ""
 player = ""
+timeEnded = 0
+restartGame = 0
+cameraLeftMax = 0
+cameraRightMax = 0
+levelSeconds = 0
 velocity = 0
 inAir = 0
-moveSpeed = 5
+moveSpeed = Math.Round(playerWidth / 5)
 position = 0
 movmentExceleration = 0
-exceleration = 10
+exceleration = Math.Round(playerHeight / 4)
 lastMovedX = 1
 frames = 0
 walkingAnimationType = 1
@@ -57,14 +73,18 @@ hitBlockBottom = 0
 ' 1 = playerIdleRight, 2 = playerIdleLeft, 3 = playerWalkingRight, 4 = playerWalkingLeft, 5 = playerInAirRight, 6 = playerInAirLeft
 lastPlayerSprite = 1
 
-SetupBlocks()
+ReadLevelFile()
 LoadFirstScreen()
 DrawPlayer()
 
-frameCount = Clock.ElapsedMilliseconds
-framesSinceLastCount = 0
+framesSinceLastCount = 60
+OnTick()
 
 While "True"
+  If timeEnded = 1 Then
+    Goto endLoop
+  EndIf
+  
   start = Clock.ElapsedMilliseconds
   
   playerLeft = Shapes.GetLeft(player)
@@ -106,7 +126,7 @@ While "True"
         blockTop = Shapes.GetTop(blockShapes[h][w])
         blockBottom = blockTop + blockSize
         ' Ако блока не е на екрана, няма смисъл да го проверявам
-        If blockLeft > 0 And blockLeft < gw Then
+        If blockRight > -blockSize And blockLeft < gw + blockSize Then
           ' Провери дали блока се удря
           If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
             ' Проверка дали блока се удря от дясно
@@ -124,15 +144,16 @@ While "True"
             EndIf
             ' Провери дали блока се удря от долу
             If playerTop > blockBottom - moveSpeed * 2 And playerTop - 1 < blockBottom And playerRight > blockLeft And playerLeft < blockRight Then
-              Shapes.Move(player, playerLeft, blockBottom)
+              Shapes.Move(player, playerLeft, blockBottom - 1)
               playerTop = Shapes.GetTop(player)
               playerBottom = playerTop + playerHeight
               hitBlockTop = 1
               If inAir = 1 Then
                 velocity = -1
               EndIf
+            EndIf
             ' Проверка дали блока се удря от горе
-            ElseIf playerBottom > blockTop - 1 And playerBottom < blockTop + moveSpeed * 2 And playerRight > blockLeft And playerLeft < blockRight Then
+            If playerBottom > blockTop - 2 And playerBottom < blockTop + moveSpeed * 2 And playerRight > blockLeft And playerLeft < blockRight Then
               Shapes.Move(player, playerLeft, blockTop - playerHeight)
               playerTop = Shapes.GetTop(player)
               playerBottom = playerTop + playerHeight
@@ -149,16 +170,7 @@ While "True"
   MovePlayer()
   MoveEnemies()
   
-  If Clock.ElapsedMilliseconds - frameCount >= 1000 Then
-    GraphicsWindow.BrushColor = "Black"
-    GraphicsWindow.FillRectangle(0, 0, 50, 25)
-    GraphicsWindow.BrushColor = "White"
-    GraphicsWindow.DrawText(5, 5, framesSinceLastCount + " fps")
-    frameCount = Clock.ElapsedMilliseconds
-    framesSinceLastCount = 0
-  Else
-    framesSinceLastCount = framesSinceLastCount + 1
-  EndIf
+  framesSinceLastCount = framesSinceLastCount + 1
   
   ' Играта върви с 60 fps
   delay = 10 - (Clock.ElapsedMilliseconds - start)
@@ -167,10 +179,42 @@ While "True"
   EndIf
   
   frames = frames + 1
-  If frames = 61 Then
+  If frames = 60 Then
     frames = 0
   EndIf
 EndWhile
+endLoop:
+
+While restartGame = 0
+EndWhile
+
+Goto startGame
+
+Sub OnTick
+  If timeEnded = 1 Then
+    Goto endTick
+  EndIf
+  
+  levelSeconds = levelSeconds - 1
+    
+  If levelSeconds = 0 Then
+    Shapes.Move(player, -playerWidth, -playerHeight)
+    timeEnded = 1
+    GraphicsWindow.ShowMessage("Свърши ти времето", "Край на играта")
+    restartGame = 1
+  EndIf
+  
+  GraphicsWindow.BrushColor = "Black"
+  GraphicsWindow.FillRectangle(0, 0, 100, 30)
+  GraphicsWindow.BrushColor = "White"
+  GraphicsWindow.DrawText(5, 7, framesSinceLastCount + " fps")
+  GraphicsWindow.BrushColor = "Yellow"
+  GraphicsWindow.DrawText(55, 2, "Time")
+  GraphicsWindow.DrawText(57, 15, levelSeconds)
+  framesSinceLastCount = 0
+  
+  endTick:
+EndSub
 
 Sub MovePlayer
   playerLeft = Shapes.GetLeft(player)
@@ -219,7 +263,7 @@ Sub MovePlayer
     lastMovedX = 1
     
     If movmentExceleration <= moveSpeed Then
-      movmentExceleration = movmentExceleration + 0.1
+      movmentExceleration = movmentExceleration + 0.2
     EndIf
     
     If inAir = 0 And (Math.Remainder(frames, 8) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
@@ -229,14 +273,13 @@ Sub MovePlayer
         player = Shapes.AddImage(playerWalkingRight)
         walkingAnimationType = 1
       Else
-        player = Shapes.AddImage(playerIdleRight)
+        player = Shapes.AddImage(playerWalkingRight2)
         walkingAnimationType = 0
       EndIf
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
     
     MoveLevelRight()
-    position = position + movmentExceleration
   ' Премести ако се движи на ляво
   ElseIf keyboard["Left"] = 1 And hitBlockLeft = 0 Then
     If lastMovedX <> 2 Then
@@ -245,7 +288,7 @@ Sub MovePlayer
     lastMovedX = 2
     
     If movmentExceleration <= moveSpeed Then
-      movmentExceleration = movmentExceleration + 0.1
+      movmentExceleration = movmentExceleration + 0.2
     EndIf
     
     If inAir = 0 And (Math.Remainder(frames, 8) = 0 Or (lastPlayerSprite <> 3 And lastPlayerSprite <> 4)) Then
@@ -255,17 +298,64 @@ Sub MovePlayer
         player = Shapes.AddImage(playerWalkingLeft)
         walkingAnimationType = 1
       Else
-        player = Shapes.AddImage(playerIdleLeft)
+        player = Shapes.AddImage(playerWalkingLeft2)
         walkingAnimationType = 0
       EndIf
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
     
     MoveLevelLeft()
-    position = position - movmentExceleration
   ' Ако не се движи в нито една посока тогава му премахни натрупаната бързина
   Else
     movmentExceleration = 1
+  EndIf
+EndSub
+
+Sub MoveLevelRight
+  If position >= cameraLeftMax - moveSpeed * 2 And position <= cameraRightMax And playerLeft > gw / 2 - playerWidth / 2 Then
+    ' Премести всички блокове
+    For h = 1 To Array.GetItemCount(blocks)
+      For w = 1 To Array.GetItemCount(blocks[h])
+        If blocks[h][w] <> "0" Then
+          blockLeft = Shapes.GetLeft(blockShapes[h][w])
+          blockTop = Shapes.GetTop(blockShapes[h][w])
+          Shapes.Move(blockShapes[h][w], blockLeft - movmentExceleration, blockTop)
+        EndIf
+      EndFor
+    EndFor
+    ' Премести всички противници
+    For i = 1 To Array.GetItemCount(enemyShapes)
+      enemyLeft = Shapes.GetLeft(enemyShapes[i])
+      enemyTop = Shapes.GetTop(enemyShapes[i])
+      Shapes.Move(enemyShapes[i], enemyLeft - movmentExceleration, enemyTop)
+    EndFor
+    position = position + movmentExceleration
+  Else
+    Shapes.Move(player, playerLeft + movmentExceleration, playerTop)
+  EndIf
+EndSub
+
+Sub MoveLevelLeft
+  If position >= cameraLeftMax And position <= cameraRightMax + moveSpeed * 2 And playerLeft < gw / 2 + playerWidth / 2 Then
+    ' Премести всички блокове
+    For h = 1 To Array.GetItemCount(blocks)
+      For w = 1 To Array.GetItemCount(blocks[h])
+        If blocks[h][w] <> "0" Then
+          blockLeft = Shapes.GetLeft(blockShapes[h][w])
+          blockTop = Shapes.GetTop(blockShapes[h][w])
+          Shapes.Move(blockShapes[h][w], blockLeft + movmentExceleration, blockTop)
+        EndIf
+      EndFor
+    EndFor
+    ' Премести всички противници
+    For i = 1 To Array.GetItemCount(enemyShapes)
+      enemyLeft = Shapes.GetLeft(enemyShapes[i])
+      enemyTop = Shapes.GetTop(enemyShapes[i])
+      Shapes.Move(enemyShapes[i], enemyLeft + movmentExceleration, enemyTop)
+    EndFor
+    position = position - movmentExceleration
+  Else
+    Shapes.Move(player, playerLeft - movmentExceleration, playerTop)
   EndIf
 EndSub
 
@@ -293,18 +383,16 @@ Sub MoveEnemies
           ' Провери дали блока се удря
           If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
             ' Проверка дали блока се удря от дясно
-            If (enemyRight >= blockLeft And enemyRight < blockLeft + 5 Or enemyLeft > blockRight - 5 And enemyLeft <= blockRight) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
+            If ((enemyRight >= blockLeft And enemyRight < blockLeft + 5) Or (enemyLeft > blockRight - 5 And enemyLeft <= blockRight)) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
               If enemies[i]["facing"] = 1 Then
                 enemies[i]["facing"] = 0
               Else
                 enemies[i]["facing"] = 1
               EndIf
             EndIf
-            ' Провери дали блока се удря от долу
-            If enemyTop > blockBottom - 1 And enemyTop < blockBottom And enemyRight > blockLeft And enemyLeft < blockRight Then
-              enemies[i]["velocity"] = 1
+            
             ' Проверка дали блока се удря от горе
-            ElseIf enemyBottom > blockTop - 5 And enemyBottom < blockTop + 5 And enemyRight > blockLeft And enemyLeft < blockRight Then
+            If enemyBottom > blockTop - 1 And enemyBottom < blockTop + 1 And enemyRight > blockLeft And enemyLeft < blockRight Then
               enemies[i]["velocity"] = 0
               enemyHitBlockBottom = 1
             EndIf
@@ -314,52 +402,25 @@ Sub MoveEnemies
     EndFor
     
     If enemyHitBlockBottom = 0 Then
-      enemies[i]["velocity"] = 1
+      enemies[i]["velocity"] = -1
+    EndIf
+    
+    If Math.Remainder(frames, 10) = 0 Then
+      Shapes.Remove(enemyShapes[i])
+      If enemies[i]["animation"] = 1 Then
+        enemies[i]["animation"] = 0
+        enemyShapes[i] = Shapes.AddImage(enemy1_2)
+      ElseIf enemies[i]["animation"] = 0 Then
+        enemies[i]["animation"] = 1
+        enemyShapes[i] = Shapes.AddImage(enemy1_1)
+      EndIf
     EndIf
     
     If enemies[i]["facing"] = 1 Then
-      Shapes.Move(enemyShapes[i], enemyLeft + 1, enemyTop + enemies[i]["velocity"])
+      Shapes.Move(enemyShapes[i], enemyLeft + 1, enemyTop - enemies[i]["velocity"])
     Else
-      Shapes.Move(enemyShapes[i], enemyLeft - 1, enemyTop + enemies[i]["velocity"])
+      Shapes.Move(enemyShapes[i], enemyLeft - 1, enemyTop - enemies[i]["velocity"])
     EndIf
-  EndFor
-EndSub
-
-Sub MoveLevelRight
-  ' Премести всички блокове
-  For h = 1 To Array.GetItemCount(blocks)
-    For w = 1 To Array.GetItemCount(blocks[h])
-      If blocks[h][w] <> "0" Then
-        blockLeft = Shapes.GetLeft(blockShapes[h][w])
-        blockTop = Shapes.GetTop(blockShapes[h][w])
-        Shapes.Move(blockShapes[h][w], blockLeft - movmentExceleration, blockTop)
-      EndIf
-    EndFor
-  EndFor
-  ' Премести всички противници
-  For i = 1 To Array.GetItemCount(enemyShapes)
-    enemyLeft = Shapes.GetLeft(enemyShapes[i])
-    enemyTop = Shapes.GetTop(enemyShapes[i])
-    Shapes.Move(enemyShapes[i], enemyLeft - movmentExceleration, enemyTop)
-  EndFor
-EndSub
-
-Sub MoveLevelLeft
-  ' Премести всички блокове
-  For h = 1 To Array.GetItemCount(blocks)
-    For w = 1 To Array.GetItemCount(blocks[h])
-      If blocks[h][w] <> "0" Then
-        blockLeft = Shapes.GetLeft(blockShapes[h][w])
-        blockTop = Shapes.GetTop(blockShapes[h][w])
-        Shapes.Move(blockShapes[h][w], blockLeft + movmentExceleration, blockTop)
-      EndIf
-    EndFor
-  EndFor
-  ' Премести всички противници
-  For i = 1 To Array.GetItemCount(enemyShapes)
-    enemyLeft = Shapes.GetLeft(enemyShapes[i])
-    enemyTop = Shapes.GetTop(enemyShapes[i])
-    Shapes.Move(enemyShapes[i], enemyLeft + movmentExceleration, enemyTop)
   EndFor
 EndSub
 
@@ -411,14 +472,16 @@ Sub SetNotInAir
   EndIf
 EndSub
 
-Sub SetupBlocks
+Sub ReadLevelFile
   i = 1
   line = File.ReadLine(levelPath, i)
   scanType = 1
   While line <> ""
-    If line = "///" Then
+    While line = "///"
       scanType = scanType + 1
-    EndIf
+      i = i + 1
+      line = File.ReadLine(levelPath, i)
+    EndWhile
     
     ' Взимаме информацията за блоковете в нивото
     If scanType = 1 Then
@@ -428,7 +491,7 @@ Sub SetupBlocks
         itemCount = Array.GetItemCount(blocks[i]) + 1
         blocks[i][itemCount] = val
       EndWhile
-    ' Взимаме информацията  за противниците в нивото
+    ' Взимаме информацията за противниците в нивото
     ElseIf scanType = 2 Then
       itemCount = Array.GetItemCount(enemies[i]) + 1
     
@@ -448,6 +511,30 @@ Sub SetupBlocks
       enemies[itemCount]["facing"] = val
       
       enemies[itemCount]["type"] = line
+    ' Взимаме информацията за до къде може камерата да стигне
+    ElseIf scanType = 3 Then
+      indexOf = Text.GetIndexOf(line, " ")
+      val = Text.GetSubText(line, 1, indexOf)
+      line = Text.GetSubTextToEnd(line, indexOf + 1)
+      cameraLeftMax = val * blockSize
+      
+      indexOf = Text.GetIndexOf(line, " ")
+      val = Text.GetSubText(line, 1, indexOf)
+      line = Text.GetSubTextToEnd(line, indexOf + 1)
+      cameraRightMax = val * blockSize
+      
+      cameraTopMax = line * blockSize
+    ' Взимаме информацията за къде играча да се появи
+    ElseIf scanType = 4 Then
+      indexOf = Text.GetIndexOf(line, " ")
+      val = Text.GetSubText(line, 1, indexOf)
+      line = Text.GetSubTextToEnd(line, indexOf + 1)
+      playerStartingPositionTop = val * blockSize
+      
+      playerStartingPositionLeft = line * blockSize
+    ' Взимаме информацията за времето което имаш да преключиш нивото в секунди
+    ElseIf scanType = 5 Then
+      levelSeconds = line
     EndIf
     
     i = i + 1
@@ -460,43 +547,34 @@ Sub LoadFirstScreen
   backgroundOverworld = ImageList.LoadImage(Program.Directory + "\backgrounds\background_overworld.jpg")
   GraphicsWindow.DrawResizedImage(backgroundOverworld, 0, 0, gw, gh)
   
+  position = cameraLeftMax
+  
   ' Зареди блоковете
   For h = 1 To Array.GetItemCount(blocks)
     For w = 1 To Array.GetItemCount(blocks[h])
-      If blocks[h][w] = "1" Then
-        blockShapes[h][w] = Shapes.AddImage(tile1)
-      ElseIf blocks[h][w] = "2" Then
-        blockShapes[h][w] = Shapes.AddImage(tile2)
-      ElseIf blocks[h][w] = "3" Then
-        blockShapes[h][w] = Shapes.AddImage(tile3)
-      ElseIf blocks[h][w] = "4" Then
-        blockShapes[h][w] = Shapes.AddImage(tile4)
-      ElseIf blocks[h][w] = "5" Then
-        blockShapes[h][w] = Shapes.AddImage(tile5)
-      ElseIf blocks[h][w] = "6" Then
-        blockShapes[h][w] = Shapes.AddImage(tile6)
-      ElseIf blocks[h][w] = "7" Then
-        blockShapes[h][w] = Shapes.AddImage(tile7)
+      If blocks[h][w] <> "0" Then
+        blockShapes[h][w] = Shapes.AddImage(tiles[blocks[h][w]])
+        Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position, h * blockSize - blockSize - cameraTopMax)
       EndIf
-      Shapes.Move(blockShapes[h][w], w * blockSize - blockSize, h * blockSize - blockSize)
     EndFor
   EndFor
   
   ' Постави противниците
   For i = 1 To Array.GetItemCount(enemies)
     If enemies[i]["type"] = 1 Then
-      enemyShapes[i] = Shapes.AddRectangle(blockSize, blockSize)
+      enemyShapes[i] = Shapes.AddImage(enemy1_1)
       enemies[i]["width"] = blockSize
       enemies[i]["height"] = blockSize
     EndIf
     Shapes.Move(enemyShapes[i], enemies[i]["left"] * blockSize - blockSize + 1, enemies[i]["top"] * blockSize - blockSize - 1)
     enemies[i]["velocity"] = 0
+    enemies[i]["animation"] = 0
   EndFor
 EndSub
 
 Sub DrawPlayer
   player = Shapes.AddImage(playerIdleRight)
-  Shapes.Move(player, gw / 2, gh - blockSize * 2 - 1)
+  Shapes.Move(player, playerStartingPositionLeft - blockSize, playerStartingPositionTop - 1 - blockSize)
 EndSub
 
 Sub OnKeyDown
