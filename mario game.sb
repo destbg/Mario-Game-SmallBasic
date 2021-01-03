@@ -113,9 +113,15 @@ While "True"
     enemyBottom = enemyTop + enemies[i]["height"]
     
     If playerRight >= enemyLeft And playerLeft <= enemyRight And playerTop <= enemyBottom And playerBottom >= enemyTop Then
-      Shapes.Move(player, -playerWidth, -playerHeight)
-      GraphicsWindow.ShowMessage("Беше убит от противник", "Край на играта")
-      Goto startGame
+      If velocity < 0 Then
+        velocity = 5
+        Shapes.Remove(enemyShapes[i])
+        enemies[i]["alive"] = 0
+      Else
+        Shapes.Move(player, -playerWidth, -playerHeight)
+        GraphicsWindow.ShowMessage("Беше убит от противник", "Край на играта")
+        Goto startGame
+      EndIf
     EndIf
   EndFor
   
@@ -390,13 +396,23 @@ EndSub
 
 Sub MoveEnemies
   For i = 1 To Array.GetItemCount(enemyShapes)
+    If enemies[i]["alive"] = 0 Then
+      Goto endOfEnemyLoop
+    EndIf
+    
     enemyLeft = Shapes.GetLeft(enemyShapes[i])
     enemyRight = enemyLeft + enemies[i]["width"]
+    
+    If enemyRight < 0 Or enemyLeft > gw Then
+      Goto endOfEnemyLoop
+    EndIf
+    
     enemyTop = Shapes.GetTop(enemyShapes[i])
     enemyBottom = enemyTop + enemies[i]["height"]
     
     If enemyTop >= Array.GetItemCount(blocks) * blockSize Then
       Shapes.Remove(enemyShapes[i])
+      enemies[i]["alive"] = 0
     EndIf
     
     enemyHitBlockBottom = 0
@@ -409,21 +425,23 @@ Sub MoveEnemies
           blockRight = blockLeft + blockSize
           blockTop = h * blockSize - blockSize - cameraTopMax
           blockBottom = blockTop + blockSize
-          ' Провери дали блока се удря
-          If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
-            ' Проверка дали блока се удря от дясно
-            If ((enemyRight >= blockLeft And enemyRight < blockLeft + 5) Or (enemyLeft > blockRight - 5 And enemyLeft <= blockRight)) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
-              If enemies[i]["facing"] = 1 Then
-                enemies[i]["facing"] = 0
-              Else
-                enemies[i]["facing"] = 1
+          If blockRight > -blockSize And blockLeft < gw + blockSize Then
+            ' Провери дали блока се удря
+            If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
+              ' Проверка дали блока се удря от дясно
+              If ((enemyRight >= blockLeft And enemyRight < blockLeft + 5) Or (enemyLeft > blockRight - 5 And enemyLeft <= blockRight)) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
+                If enemies[i]["facing"] = 1 Then
+                  enemies[i]["facing"] = 0
+                Else
+                  enemies[i]["facing"] = 1
+                EndIf
               EndIf
-            EndIf
-            
-            ' Проверка дали блока се удря от горе
-            If enemyBottom > blockTop - 1 And enemyBottom < blockTop + 1 And enemyRight > blockLeft And enemyLeft < blockRight Then
-              enemies[i]["velocity"] = 0
-              enemyHitBlockBottom = 1
+              
+              ' Проверка дали блока се удря от горе
+              If enemyBottom > blockTop - 1 And enemyBottom < blockTop + 1 And enemyRight > blockLeft And enemyLeft < blockRight Then
+                enemies[i]["velocity"] = 0
+                enemyHitBlockBottom = 1
+              EndIf
             EndIf
           EndIf
         EndIf
@@ -450,6 +468,8 @@ Sub MoveEnemies
     Else
       Shapes.Move(enemyShapes[i], enemyLeft - 1, enemyTop - enemies[i]["velocity"])
     EndIf
+    
+    endOfEnemyLoop:
   EndFor
 EndSub
 
@@ -522,7 +542,7 @@ Sub ReadLevelFile
       EndWhile
     ' Взимаме информацията за противниците в нивото
     ElseIf scanType = 2 Then
-      itemCount = Array.GetItemCount(enemies[i]) + 1
+      itemCount = Array.GetItemCount(enemies) + 1
     
       indexOf = Text.GetIndexOf(line, " ")
       val = Text.GetSubText(line, 1, indexOf)
@@ -600,6 +620,7 @@ Sub LoadFirstScreen
     Shapes.Move(enemyShapes[i], enemies[i]["left"] * blockSize - blockSize + 1, enemies[i]["top"] * blockSize - blockSize - 1)
     enemies[i]["velocity"] = 0
     enemies[i]["animation"] = 0
+    enemies[i]["alive"] = 1
   EndFor
 EndSub
 
