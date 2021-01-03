@@ -77,6 +77,8 @@ ReadLevelFile()
 LoadFirstScreen()
 DrawPlayer()
 
+lag = 0
+frameDelay = 14
 framesSinceLastCount = 60
 OnTick()
 
@@ -117,6 +119,69 @@ While "True"
     EndIf
   EndFor
   
+  BlockCheck()
+  MovePlayer()
+  MoveEnemies()
+  
+  framesSinceLastCount = framesSinceLastCount + 1
+  ' Играта върви с 60 fps
+  delay = frameDelay - (Clock.ElapsedMilliseconds - start) - lag
+  If (delay > 0) Then
+    lag = 0
+    Program.Delay(delay)
+  Else
+    lag = lag + frameDelay - (Clock.ElapsedMilliseconds - start)
+  EndIf
+  
+  frames = frames + 1
+  If frames = 60 Then
+    frames = 0
+  EndIf
+EndWhile
+endLoop:
+
+While restartGame = 0
+EndWhile
+
+Goto startGame
+
+Sub OnTick
+  If timeEnded = 1 Then
+    Goto endTick
+  EndIf
+  
+  If framesSinceLastCount > 70 Then
+    frameDelay = frameDelay + 5
+  ElseIf framesSinceLastCount < 50 Then
+    frameDelay = frameDelay - 5
+  EndIf
+  
+  If frameDelay < 0 Then
+    frameDelay = 0
+  EndIf
+  
+  levelSeconds = levelSeconds - 1
+    
+  If levelSeconds = 0 Then
+    Shapes.Move(player, -playerWidth, -playerHeight)
+    timeEnded = 1
+    GraphicsWindow.ShowMessage("Свърши ти времето", "Край на играта")
+    restartGame = 1
+  EndIf
+  
+  GraphicsWindow.BrushColor = "Black"
+  GraphicsWindow.FillRectangle(0, 0, 100, 30)
+  GraphicsWindow.BrushColor = "White"
+  GraphicsWindow.DrawText(5, 7, framesSinceLastCount + " fps")
+  GraphicsWindow.BrushColor = "Yellow"
+  GraphicsWindow.DrawText(55, 2, "Time")
+  GraphicsWindow.DrawText(57, 15, levelSeconds)
+  framesSinceLastCount = 0
+  
+  endTick:
+EndSub
+
+Sub BlockCheck
   ' Проверяваме дали играча докосва някакъв блок
   For h = 1 To Array.GetItemCount(blocks)
     For w = 1 To Array.GetItemCount(blocks[h])
@@ -166,54 +231,6 @@ While "True"
       EndIf
     EndFor
   EndFor
-  
-  MovePlayer()
-  MoveEnemies()
-  
-  framesSinceLastCount = framesSinceLastCount + 1
-  
-  ' Играта върви с 60 fps
-  delay = 10 - (Clock.ElapsedMilliseconds - start)
-  If (delay > 0) Then
-    Program.Delay(delay)
-  EndIf
-  
-  frames = frames + 1
-  If frames = 60 Then
-    frames = 0
-  EndIf
-EndWhile
-endLoop:
-
-While restartGame = 0
-EndWhile
-
-Goto startGame
-
-Sub OnTick
-  If timeEnded = 1 Then
-    Goto endTick
-  EndIf
-  
-  levelSeconds = levelSeconds - 1
-    
-  If levelSeconds = 0 Then
-    Shapes.Move(player, -playerWidth, -playerHeight)
-    timeEnded = 1
-    GraphicsWindow.ShowMessage("Свърши ти времето", "Край на играта")
-    restartGame = 1
-  EndIf
-  
-  GraphicsWindow.BrushColor = "Black"
-  GraphicsWindow.FillRectangle(0, 0, 100, 30)
-  GraphicsWindow.BrushColor = "White"
-  GraphicsWindow.DrawText(5, 7, framesSinceLastCount + " fps")
-  GraphicsWindow.BrushColor = "Yellow"
-  GraphicsWindow.DrawText(55, 2, "Time")
-  GraphicsWindow.DrawText(57, 15, levelSeconds)
-  framesSinceLastCount = 0
-  
-  endTick:
 EndSub
 
 Sub MovePlayer
@@ -317,9 +334,15 @@ Sub MoveLevelRight
     For h = 1 To Array.GetItemCount(blocks)
       For w = 1 To Array.GetItemCount(blocks[h])
         If blocks[h][w] <> "0" Then
-          blockLeft = Shapes.GetLeft(blockShapes[h][w])
-          blockTop = Shapes.GetTop(blockShapes[h][w])
-          Shapes.Move(blockShapes[h][w], blockLeft - movmentExceleration, blockTop)
+          If w * blockSize - blockSize < position - blockSize Then
+            Shapes.Remove(blockShapes[h][w])
+          ElseIf w * blockSize - blockSize > position + gw And w * blockSize - blockSize < position + gw + blockSize Then
+            blockShapes[h][w] = Shapes.AddImage(tiles[blocks[h][w]])
+            Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position - movmentExceleration, h * blockSize - blockSize - cameraTopMax)
+          Else
+            blockTop = Shapes.GetTop(blockShapes[h][w])
+            Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position - movmentExceleration, blockTop)
+          EndIf
         EndIf
       EndFor
     EndFor
@@ -341,9 +364,15 @@ Sub MoveLevelLeft
     For h = 1 To Array.GetItemCount(blocks)
       For w = 1 To Array.GetItemCount(blocks[h])
         If blocks[h][w] <> "0" Then
-          blockLeft = Shapes.GetLeft(blockShapes[h][w])
-          blockTop = Shapes.GetTop(blockShapes[h][w])
-          Shapes.Move(blockShapes[h][w], blockLeft + movmentExceleration, blockTop)
+          If w * blockSize - blockSize > position + gw Then
+            Shapes.Remove(blockShapes[h][w])
+          ElseIf w * blockSize - blockSize < position - blockSize And w * blockSize - blockSize > position - (blockSize * 2) Then
+            blockShapes[h][w] = Shapes.AddImage(tiles[blocks[h][w]])
+            Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position + movmentExceleration, h * blockSize - blockSize - cameraTopMax)
+          Else
+            blockTop = Shapes.GetTop(blockShapes[h][w])
+            Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position + movmentExceleration, blockTop)
+          EndIf
         EndIf
       EndFor
     EndFor
@@ -521,7 +550,7 @@ Sub ReadLevelFile
       indexOf = Text.GetIndexOf(line, " ")
       val = Text.GetSubText(line, 1, indexOf)
       line = Text.GetSubTextToEnd(line, indexOf + 1)
-      cameraRightMax = val * blockSize
+      cameraRightMax = (Array.GetItemCount(blocks[1]) - val) * blockSize
       
       cameraTopMax = line * blockSize
     ' Взимаме информацията за къде играча да се появи
@@ -552,9 +581,11 @@ Sub LoadFirstScreen
   ' Зареди блоковете
   For h = 1 To Array.GetItemCount(blocks)
     For w = 1 To Array.GetItemCount(blocks[h])
-      If blocks[h][w] <> "0" Then
-        blockShapes[h][w] = Shapes.AddImage(tiles[blocks[h][w]])
-        Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position, h * blockSize - blockSize - cameraTopMax)
+      If position - blockSize < w * blockSize - blockSize And position + gw + blockSize > w * blockSize - blockSize Then
+        If blocks[h][w] <> "0" Then
+          blockShapes[h][w] = Shapes.AddImage(tiles[blocks[h][w]])
+          Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position, h * blockSize - blockSize - cameraTopMax)
+        EndIf
       EndIf
     EndFor
   EndFor
