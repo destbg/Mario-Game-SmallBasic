@@ -4,6 +4,13 @@ blockSize = 64
 heightMultiplier = 10
 widthMultiplier = 15
 
+levelFolderPath = Program.Directory + "\levels\"
+moveSpeed = Math.Round(playerWidth / 5)
+exceleration = Math.Round(playerHeight / 4)
+keyboard["Left"] = 0
+keyboard["Right"] = 0
+keyboard["Up"] = 0
+
 GraphicsWindow.Width = blockSize * widthMultiplier - 10
 GraphicsWindow.Height = blockSize * heightMultiplier - 10
 GraphicsWindow.CanResize = "False"
@@ -40,42 +47,10 @@ Timer.Tick = OnTick
 
 startGame:
 
-GraphicsWindow.BrushColor = "White"
-GraphicsWindow.Clear()
-keyboard["Left"] = 0
-keyboard["Right"] = 0
-keyboard["Up"] = 0
-levelPath = Program.Directory + "\levels\level_1.txt"
-blocks = ""
-enemies = ""
-enemyShapes = ""
-blockShapes = ""
-player = ""
-timeEnded = 0
-restartGame = 0
-cameraLeftMax = 0
-cameraRightMax = 0
-levelSeconds = 0
-velocity = 0
-inAir = 0
-moveSpeed = Math.Round(playerWidth / 5)
-position = 0
-movmentExceleration = 0
-exceleration = Math.Round(playerHeight / 4)
-lastMovedX = 1
-frames = 0
-walkingAnimationType = 1
-hitBlockLeft = 0
-hitBlockRight = 0
-hitBlockTop = 0
-hitBlockBottom = 0
+currentLevel = 1
+currentSubLevel = 1
 
-' 1 = playerIdleRight, 2 = playerIdleLeft, 3 = playerWalkingRight, 4 = playerWalkingLeft, 5 = playerInAirRight, 6 = playerInAirLeft
-lastPlayerSprite = 1
-
-ReadLevelFile()
-LoadFirstScreen()
-DrawPlayer()
+LoadLevelInfo()
 
 lag = 0
 frameDelay = 14
@@ -154,16 +129,6 @@ Goto startGame
 Sub OnTick
   If timeEnded = 1 Then
     Goto endTick
-  EndIf
-  
-  If framesSinceLastCount > 70 Then
-    frameDelay = frameDelay + 5
-  ElseIf framesSinceLastCount < 50 Then
-    frameDelay = frameDelay - 5
-  EndIf
-  
-  If frameDelay < 0 Then
-    frameDelay = 0
   EndIf
   
   levelSeconds = levelSeconds - 1
@@ -523,13 +488,14 @@ EndSub
 
 Sub ReadLevelFile
   i = 1
-  line = File.ReadLine(levelPath, i)
+  levelFilePath = levelFolderPath + currentLevel + "-" + currentSubLevel + ".txt"
+  line = File.ReadLine(levelFilePath, i)
   scanType = 1
   While line <> ""
     While line = "///"
       scanType = scanType + 1
       i = i + 1
-      line = File.ReadLine(levelPath, i)
+      line = File.ReadLine(levelFilePath, i)
     EndWhile
     
     ' Взимаме информацията за блоковете в нивото
@@ -587,7 +553,7 @@ Sub ReadLevelFile
     EndIf
     
     i = i + 1
-    line = File.ReadLine(levelPath, i)
+    line = File.ReadLine(levelFilePath, i)
   EndWhile
 EndSub
 
@@ -647,4 +613,35 @@ Sub OnKeyUp
   ElseIf GraphicsWindow.LastKey = "Up" Or GraphicsWindow.LastKey = "W" Or GraphicsWindow.LastKey = "Space" Then
     keyboard["Up"] = 0
   EndIf
+EndSub
+
+Sub LoadLevelInfo
+  GraphicsWindow.BrushColor = "White"
+  GraphicsWindow.Clear()
+  blocks = ""
+  enemies = ""
+  enemyShapes = ""
+  blockShapes = ""
+  player = ""
+  timeEnded = 0
+  restartGame = 0
+  cameraLeftMax = 0
+  cameraRightMax = 0
+  levelSeconds = 0
+  velocity = 0
+  inAir = 0
+  position = 0
+  movmentExceleration = 0
+  lastMovedX = 1
+  frames = 0
+  walkingAnimationType = 1
+  hitBlockLeft = 0
+  hitBlockRight = 0
+  hitBlockTop = 0
+  hitBlockBottom = 0
+  lastPlayerSprite = 1
+
+  ReadLevelFile()
+  LoadFirstScreen()
+  DrawPlayer()
 EndSub
