@@ -405,9 +405,9 @@ Sub MoveEnemies
     For h = 1 To Array.GetItemCount(blocks)
       For w = 1 To Array.GetItemCount(blocks[h])
         If blocks[h][w] <> "0" Then
-          blockLeft = Shapes.GetLeft(blockShapes[h][w])
+          blockLeft = w * blockSize - blockSize - position
           blockRight = blockLeft + blockSize
-          blockTop = Shapes.GetTop(blockShapes[h][w])
+          blockTop = h * blockSize - blockSize - cameraTopMax
           blockBottom = blockTop + blockSize
           ' Провери дали блока се удря
           If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
