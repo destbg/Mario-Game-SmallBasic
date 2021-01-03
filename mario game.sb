@@ -17,6 +17,8 @@ GraphicsWindow.CanResize = "False"
 GraphicsWindow.Title = "Mario Game"
 GraphicsWindow.KeyDown = OnKeyDown
 GraphicsWindow.KeyUp = OnKeyUp
+gh = GraphicsWindow.Height
+gw = GraphicsWindow.Width
 
 playerIdleRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle right.png")
 playerIdleLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle left.png")
@@ -39,8 +41,6 @@ For i = 1 To Array.GetItemCount(imageFiles)
   
   tiles[Text.GetSubText(imagePath, 1, 1)] = ImageList.LoadImage(imageFiles[i])
 EndFor
-gh = GraphicsWindow.Height
-gw = GraphicsWindow.Width
 
 Timer.Interval = 1000
 Timer.Tick = OnTick
