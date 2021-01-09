@@ -52,7 +52,6 @@ currentSubLevel = 1
 
 LoadLevelInfo()
 
-lag = 0
 frameDelay = 14
 framesSinceLastCount = 60
 OnTick()
@@ -100,18 +99,16 @@ While "True"
     EndIf
   EndFor
   
+  GetBlocksOnScreen()
   BlockCheck()
   MovePlayer()
   MoveEnemies()
   
   framesSinceLastCount = framesSinceLastCount + 1
   ' Играта върви с 60 fps
-  delay = frameDelay - (Clock.ElapsedMilliseconds - start) - lag
+  delay = frameDelay - (Clock.ElapsedMilliseconds - start)
   If (delay > 0) Then
-    lag = 0
     Program.Delay(delay)
-  Else
-    lag = lag + frameDelay - (Clock.ElapsedMilliseconds - start)
   EndIf
   
   frames = frames + 1
@@ -152,55 +149,71 @@ Sub OnTick
   endTick:
 EndSub
 
-Sub BlockCheck
-  ' Проверяваме дали играча докосва някакъв блок
+Sub GetBlocksOnScreen
+  blocksOnScreen = ""
+  blocksOnScreenCount = 1
   For h = 1 To Array.GetItemCount(blocks)
     For w = 1 To Array.GetItemCount(blocks[h])
       If blocks[h][w] <> "0" Then
-        blockLeft = Shapes.GetLeft(blockShapes[h][w])
-        blockRight = blockLeft + blockSize
-        blockTop = Shapes.GetTop(blockShapes[h][w])
-        blockBottom = blockTop + blockSize
+        blockRight = w * blockSize - position
+        blockLeft = blockRight - blockSize
+        blockBottom = h * blockSize - cameraTopMax
+        blockTop = blockBottom - blockSize
         ' Ако блока не е на екрана, няма смисъл да го проверявам
-        If blockRight > -blockSize And blockLeft < gw + blockSize Then
-          ' Провери дали блока се удря
-          If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
-            ' Проверка дали блока се удря от дясно
-            If playerLeft > blockRight - moveSpeed And playerLeft <= blockRight And playerTop < blockBottom And playerBottom > blockTop + moveSpeed * 2 Then
-              Shapes.Move(player, blockRight, playerTop)
-              playerLeft = Shapes.GetLeft(player)
-              playerRight = playerLeft + playerWidth
-              hitBlockLeft = 1
-            ' Проверка дали блока се удря от ляво
-            ElseIf playerRight >= blockLeft And playerRight < blockLeft + moveSpeed And playerTop < blockBottom And playerBottom > blockTop Then
-              Shapes.Move(player, blockLeft - playerWidth, playerTop)
-              playerLeft = Shapes.GetLeft(player)
-              playerRight = playerLeft + playerWidth
-              hitBlockRight = 1
-            EndIf
-            ' Провери дали блока се удря от долу
-            If playerTop > blockBottom - moveSpeed * 2 And playerTop - 1 < blockBottom And playerRight > blockLeft And playerLeft < blockRight Then
-              Shapes.Move(player, playerLeft, blockBottom - 1)
-              playerTop = Shapes.GetTop(player)
-              playerBottom = playerTop + playerHeight
-              hitBlockTop = 1
-              If inAir = 1 Then
-                velocity = -1
-              EndIf
-            EndIf
-            ' Проверка дали блока се удря от горе
-            If playerBottom > blockTop - 2 And playerBottom < blockTop + moveSpeed * 2 And playerRight > blockLeft And playerLeft < blockRight Then
-              Shapes.Move(player, playerLeft, blockTop - playerHeight)
-              playerTop = Shapes.GetTop(player)
-              playerBottom = playerTop + playerHeight
-              hitBlockBottom = 1
-              SetNotInAir()
-              velocity = 0
-            EndIf
-          EndIf
+        If blockRight > -blockSize And blockLeft < gw + blockSize And blocks[h][w] <> "0" Then
+          blocksOnScreen[blocksOnScreenCount] = blockShapes[h][w]
+          blocksOnScreenCount = blocksOnScreenCount + 1
+        ElseIf blockLeft > gw + blockSize Then
+          Goto endWidthCheck
         EndIf
       EndIf
     EndFor
+    endWidthCheck:
+  EndFor
+EndSub
+
+Sub BlockCheck
+  ' Проверяваме дали играча докосва някакъв блок
+  For i = 1 To blocksOnScreenCount
+    blockLeft = Shapes.GetLeft(blocksOnScreen[i])
+    blockRight = blockLeft + blockSize
+    blockTop = Shapes.GetTop(blocksOnScreen[i])
+    blockBottom = blockTop + blockSize
+    ' Провери дали блока се удря
+    If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
+      ' Проверка дали блока се удря от дясно
+      If playerLeft > blockRight - moveSpeed And playerLeft <= blockRight And playerTop < blockBottom And playerBottom > blockTop + moveSpeed * 2 Then
+        Shapes.Move(player, blockRight, playerTop)
+        playerLeft = Shapes.GetLeft(player)
+        playerRight = playerLeft + playerWidth
+        hitBlockLeft = 1
+      ' Проверка дали блока се удря от ляво
+      ElseIf playerRight >= blockLeft And playerRight < blockLeft + moveSpeed And playerTop < blockBottom And playerBottom > blockTop Then
+        Shapes.Move(player, blockLeft - playerWidth, playerTop)
+        playerLeft = Shapes.GetLeft(player)
+        playerRight = playerLeft + playerWidth
+        hitBlockRight = 1
+      EndIf
+      ' Провери дали блока се удря от долу
+      If playerTop > blockBottom - moveSpeed * 2 And playerTop - 1 < blockBottom And playerRight > blockLeft And playerLeft < blockRight Then
+        Shapes.Move(player, playerLeft, blockBottom - 1)
+        playerTop = Shapes.GetTop(player)
+        playerBottom = playerTop + playerHeight
+        hitBlockTop = 1
+        If inAir = 1 Then
+          velocity = -1
+        EndIf
+      EndIf
+      ' Проверка дали блока се удря от горе
+      If playerBottom > blockTop - 2 And playerBottom < blockTop + moveSpeed * 2 And playerRight > blockLeft And playerLeft < blockRight Then
+        Shapes.Move(player, playerLeft, blockTop - playerHeight)
+        playerTop = Shapes.GetTop(player)
+        playerBottom = playerTop + playerHeight
+        hitBlockBottom = 1
+        SetNotInAir()
+        velocity = 0
+      EndIf
+    EndIf
   EndFor
 EndSub
 
@@ -383,34 +396,28 @@ Sub MoveEnemies
     enemyHitBlockBottom = 0
     
     ' Проверяваме дали противника докосва някакъв блок
-    For h = 1 To Array.GetItemCount(blocks)
-      For w = 1 To Array.GetItemCount(blocks[h])
-        If blocks[h][w] <> "0" Then
-          blockLeft = w * blockSize - blockSize - position
-          blockRight = blockLeft + blockSize
-          blockTop = h * blockSize - blockSize - cameraTopMax
-          blockBottom = blockTop + blockSize
-          If blockRight > -blockSize And blockLeft < gw + blockSize Then
-            ' Провери дали блока се удря
-            If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
-              ' Проверка дали блока се удря от дясно
-              If ((enemyRight >= blockLeft And enemyRight < blockLeft + 5) Or (enemyLeft > blockRight - 5 And enemyLeft <= blockRight)) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
-                If enemies[i]["facing"] = 1 Then
-                  enemies[i]["facing"] = 0
-                Else
-                  enemies[i]["facing"] = 1
-                EndIf
-              EndIf
-              
-              ' Проверка дали блока се удря от горе
-              If enemyBottom > blockTop - 1 And enemyBottom < blockTop + 1 And enemyRight > blockLeft And enemyLeft < blockRight Then
-                enemies[i]["velocity"] = 0
-                enemyHitBlockBottom = 1
-              EndIf
-            EndIf
+    For r = 1 To blocksOnScreenCount
+      blockLeft = Shapes.GetLeft(blocksOnScreen[r])
+      blockRight = blockLeft + blockSize
+      blockTop = Shapes.GetTop(blocksOnScreen[r])
+      blockBottom = blockTop + blockSize
+      ' Провери дали блока се удря
+      If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
+        ' Проверка дали блока се удря от дясно
+        If ((enemyRight >= blockLeft And enemyRight < blockLeft + 5) Or (enemyLeft > blockRight - 5 And enemyLeft <= blockRight)) And enemyTop + 1 < blockBottom And enemyBottom > blockTop Then
+          If enemies[i]["facing"] = 1 Then
+            enemies[i]["facing"] = 0
+          Else
+            enemies[i]["facing"] = 1
           EndIf
         EndIf
-      EndFor
+        
+        ' Проверка дали блока се удря от горе
+        If enemyBottom > blockTop - 1 And enemyBottom < blockTop + 1 And enemyRight > blockLeft And enemyLeft < blockRight Then
+          enemies[i]["velocity"] = 0
+          enemyHitBlockBottom = 1
+        EndIf
+      EndIf
     EndFor
     
     If enemyHitBlockBottom = 0 Then
