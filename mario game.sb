@@ -6,9 +6,6 @@ invincibilityFrames = 300
 levelFolderPath = Program.Directory + "\levels\"
 moveSpeed = 13
 exceleration = 16
-keyboard["Left"] = 0
-keyboard["Right"] = 0
-keyboard["Up"] = 0
 
 GraphicsWindow.Width = blockSize * widthMultiplier - 10
 GraphicsWindow.Height = blockSize * heightMultiplier - 10
@@ -38,6 +35,7 @@ playerInAirLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\In air
 enemy1_1 = ImageList.LoadImage(Program.Directory + "\enemy sprites\Enemy 1 1.png")
 enemy1_2 = ImageList.LoadImage(Program.Directory + "\enemy sprites\Enemy 1 2.png")
 mushroom = ImageList.LoadImage(Program.Directory + "\other sprites\Mushroom.png")
+flagTile = ImageList.LoadImage(Program.Directory + "\other tiles\Flag.png")
 
 imageFiles = File.GetFiles(Program.Directory + "\tiles")
 For i = 1 To Array.GetItemCount(imageFiles)
@@ -56,6 +54,10 @@ Timer.Tick = OnTick
 
 startGame:
 
+keyboard["Left"] = 0
+keyboard["Right"] = 0
+keyboard["Up"] = 0
+
 playerWidth = 64
 playerHeight = 64
 
@@ -69,7 +71,7 @@ framesSinceLastCount = 60
 OnTick()
 
 While "True"
-  If timeEnded = 1 Then
+  If timeEnded = 1 Or gameBeat = 1 Then
     Goto endLoop
   EndIf
   
@@ -244,6 +246,12 @@ Sub BlockCheck
     blockBottom = blockTop + blockSize
     ' Провери дали блока се удря
     If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
+      If blocks[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]] = "i" Or blocks[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]] = "h" Then
+        gameBeat = 1
+        GraphicsWindow.ShowMessage("Успя да минеш първото (и единствено) ниво", "Край на играта")
+        restartGame = 1
+      EndIf
+      
       ' Проверка дали блока се удря от дясно
       If playerLeft > blockRight - moveSpeed And playerLeft <= blockRight And playerTop < blockBottom And playerBottom > blockTop + moveSpeed * 2 Then
         Shapes.Move(player, blockRight, playerTop)
@@ -436,6 +444,7 @@ Sub MoveLevelRight
         EndIf
       EndFor
     EndFor
+    Shapes.Move(flag, Shapes.GetLeft(flag) - movmentExceleration, Shapes.GetTop(flag))
     ' Премести всички противници
     For i = 1 To Array.GetItemCount(enemyShapes)
       If enemies[i]["alive"] = 1 Then
@@ -476,6 +485,7 @@ Sub MoveLevelLeft
         EndIf
       EndFor
     EndFor
+    Shapes.Move(flag, Shapes.GetLeft(flag) + movmentExceleration, Shapes.GetTop(flag))
     ' Премести всички противници
     For i = 1 To Array.GetItemCount(enemyShapes)
       enemyLeft = Shapes.GetLeft(enemyShapes[i])
@@ -779,7 +789,11 @@ Sub LoadFirstScreen
   backgroundOverworld = ImageList.LoadImage(Program.Directory + "\backgrounds\background_overworld.jpg")
   GraphicsWindow.DrawResizedImage(backgroundOverworld, 0, 0, gw, gh)
   
-  position = cameraLeftMax
+  If cameraLeftMax > playerStartingPositionLeft - gw / 2 Then
+    position = cameraLeftMax
+  Else
+    position = playerStartingPositionLeft - gw / 2
+  EndIf
   
   ' Зареди блоковете
   For h = 1 To Array.GetItemCount(blocks)
@@ -789,6 +803,11 @@ Sub LoadFirstScreen
           blockShapes[h][w] = Shapes.AddImage(tiles[blocks[h][w]])
           Shapes.Move(blockShapes[h][w], w * blockSize - blockSize - position, h * blockSize - blockSize - cameraTopMax)
         EndIf
+      EndIf
+      
+      If blocks[h][w] = "h" Then
+        flag = Shapes.AddImage(flagTile)
+        Shapes.Move(flag, (w * blockSize) - position - blockSize - blockSize / 1.6, h * blockSize - blockSize / 10)
       EndIf
     EndFor
   EndFor
@@ -800,7 +819,7 @@ Sub LoadFirstScreen
       enemies[i]["width"] = blockSize
       enemies[i]["height"] = blockSize
     EndIf
-    Shapes.Move(enemyShapes[i], enemies[i]["left"] * blockSize - blockSize + 1, enemies[i]["top"] * blockSize - blockSize - 1)
+    Shapes.Move(enemyShapes[i], enemies[i]["left"] * blockSize - blockSize + 1 - cameraLeftMax, enemies[i]["top"] * blockSize - blockSize - 1 - cameraTopMax)
     enemies[i]["velocity"] = 0
     enemies[i]["animation"] = 0
     enemies[i]["alive"] = 1
@@ -809,7 +828,11 @@ EndSub
 
 Sub DrawPlayer
   player = Shapes.AddImage(playerIdleRight)
-  Shapes.Move(player, playerStartingPositionLeft - blockSize, playerStartingPositionTop - 1 - blockSize)
+  If cameraLeftMax > playerStartingPositionLeft - gw / 2 Then
+    Shapes.Move(player, playerStartingPositionLeft - cameraLeftMax, playerStartingPositionTop - 1 - blockSize - cameraTopMax)
+  Else
+    Shapes.Move(player, gw / 2, playerStartingPositionTop - 1 - blockSize - cameraTopMax)
+  EndIf
 EndSub
 
 Sub OnKeyDown
@@ -842,8 +865,10 @@ Sub LoadLevelInfo
   enemyShapes = ""
   blockShapes = ""
   player = ""
+  flag = ""
   playerEmpowered = 0
   playerInvincible = 0
+  gameBeat = 0
   timeEnded = 0
   restartGame = 0
   cameraLeftMax = 0
