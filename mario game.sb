@@ -1,12 +1,11 @@
-playerWidth = 64
-playerHeight = 64
 blockSize = 64
 heightMultiplier = 10
 widthMultiplier = 15
+invincibilityFrames = 300
 
 levelFolderPath = Program.Directory + "\levels\"
-moveSpeed = Math.Round(playerWidth / 5)
-exceleration = Math.Round(playerHeight / 4)
+moveSpeed = 13
+exceleration = 16
 keyboard["Left"] = 0
 keyboard["Right"] = 0
 keyboard["Up"] = 0
@@ -20,16 +19,26 @@ GraphicsWindow.KeyUp = OnKeyUp
 gh = GraphicsWindow.Height
 gw = GraphicsWindow.Width
 
+playerEmpoweredIdleRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered idle right.png")
+playerEmpoweredIdleLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered idle left.png")
+playerEmpoweredWalkingRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered walking right.png")
+playerEmpoweredWalkingRight2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered walking right 2.png")
+playerEmpoweredWalkingLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered walking left.png")
+playerEmpoweredWalkingLeft2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered walking left 2.png")
+playerEmpoweredInAirRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered in air right.png")
+playerEmpoweredInAirLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered in air left.png")
 playerIdleRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle right.png")
 playerIdleLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Idle left.png")
 playerWalkingRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking right.png")
 playerWalkingRight2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking right 2.png")
-playerWalkingLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left 2.png")
-playerWalkingLeft2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left.png")
+playerWalkingLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left.png")
+playerWalkingLeft2 = ImageList.LoadImage(Program.Directory + "\mario sprites\Walking left 2.png")
 playerInAirRight = ImageList.LoadImage(Program.Directory + "\mario sprites\In air right.png")
 playerInAirLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\In air left.png")
 enemy1_1 = ImageList.LoadImage(Program.Directory + "\enemy sprites\Enemy 1 1.png")
 enemy1_2 = ImageList.LoadImage(Program.Directory + "\enemy sprites\Enemy 1 2.png")
+mushroom = ImageList.LoadImage(Program.Directory + "\other sprites\Mushroom.png")
+
 imageFiles = File.GetFiles(Program.Directory + "\tiles")
 For i = 1 To Array.GetItemCount(imageFiles)
   imagePath = imageFiles[i]
@@ -46,6 +55,9 @@ Timer.Interval = 1000
 Timer.Tick = OnTick
 
 startGame:
+
+playerWidth = 64
+playerHeight = 64
 
 currentLevel = 1
 currentSubLevel = 1
@@ -79,30 +91,79 @@ While "True"
   hitBlockTop = 0
   hitBlockBottom = 0
   
-  ' Проверка дали се удряш с някой противник
-  For i = 1 To Array.GetItemCount(enemyShapes)
-    enemyLeft = Shapes.GetLeft(enemyShapes[i])
-    enemyRight = enemyLeft + enemies[i]["width"]
-    enemyTop = Shapes.GetTop(enemyShapes[i])
-    enemyBottom = enemyTop + enemies[i]["height"]
+  ' Проверка дали се удряш с някой друг sprite
+  For i = 1 To Array.GetItemCount(otherSprites)
+    spriteLeft = Shapes.GetLeft(otherSprites[i]["Shape"])
+    spriteRight = spriteLeft + blockSize
+    spriteTop = Shapes.GetTop(otherSprites[i]["Shape"])
+    spriteBottom = spriteTop + blockSize
     
-    If playerRight >= enemyLeft And playerLeft <= enemyRight And playerTop <= enemyBottom And playerBottom >= enemyTop Then
-      If velocity < 0 Then
-        velocity = 5
-        Shapes.Remove(enemyShapes[i])
-        enemies[i]["alive"] = 0
-      Else
-        Shapes.Move(player, -playerWidth, -playerHeight)
-        GraphicsWindow.ShowMessage("Беше убит от противник", "Край на играта")
-        Goto startGame
+    If playerRight > spriteLeft And playerLeft < spriteRight And playerTop < spriteBottom And playerBottom > spriteTop Then
+      If otherSprites[i]["Type"] = 1 Then
+        If playerEmpowered = 1 Then
+          Goto dontEmpowerAgain
+        EndIf
+        playerEmpowered = 1
+        Shapes.Remove(player)
+        player = Shapes.AddImage(playerEmpoweredIdleRight)
+        Shapes.Move(player, playerLeft, playerTop - playerHeight)
+        playerHeight = playerHeight * 2
+        playerLeft = Shapes.GetLeft(player)
+        playerRight = playerLeft + playerWidth
+        playerTop = Shapes.GetTop(player)
+        playerBottom = playerTop + playerHeight
+        dontEmpowerAgain:
+        
+        Shapes.Remove(otherSprites[i]["Shape"])
+        otherSprites[i]["Alive"] = 0
       EndIf
     EndIf
   EndFor
+  
+  If playerInvincible = 0 Then
+    ' Проверка дали се удряш с някой противник
+    For i = 1 To Array.GetItemCount(enemyShapes)
+      enemyLeft = Shapes.GetLeft(enemyShapes[i])
+      enemyRight = enemyLeft + enemies[i]["width"]
+      enemyTop = Shapes.GetTop(enemyShapes[i])
+      enemyBottom = enemyTop + enemies[i]["height"]
+      
+      If playerRight > enemyLeft And playerLeft < enemyRight And playerTop < enemyBottom And playerBottom > enemyTop Then
+        If velocity < 0 Then
+          velocity = 5
+          Shapes.Remove(enemyShapes[i])
+          enemies[i]["alive"] = 0
+        Else
+          If playerEmpowered = 1 Then
+            playerEmpowered = 0
+            playerInvincible = invincibilityFrames
+            Shapes.Remove(player)
+            player = Shapes.AddImage(playerIdleRight)
+            playerHeight = playerHeight / 2
+            Shapes.Move(player, playerLeft, playerTop + playerHeight)
+            playerLeft = Shapes.GetLeft(player)
+            playerRight = playerLeft + playerWidth
+            playerTop = Shapes.GetTop(player)
+            playerBottom = playerTop + playerHeight
+          Else
+            Shapes.Move(player, -playerWidth, -playerHeight)
+            GraphicsWindow.ShowMessage("Беше убит от противник", "Край на играта")
+            Goto startGame
+          EndIf
+        EndIf
+      EndIf
+    EndFor
+  EndIf
   
   GetBlocksOnScreen()
   BlockCheck()
   MovePlayer()
   MoveEnemies()
+  MoveOtherSprites()
+  
+  If playerInvincible <> 0 Then
+    playerInvincible = playerInvincible - 1
+  EndIf
   
   framesSinceLastCount = framesSinceLastCount + 1
   ' Играта върви с 60 fps
@@ -161,7 +222,8 @@ Sub GetBlocksOnScreen
         blockTop = blockBottom - blockSize
         ' Ако блока не е на екрана, няма смисъл да го проверявам
         If blockRight > -blockSize And blockLeft < gw + blockSize And blocks[h][w] <> "0" Then
-          blocksOnScreen[blocksOnScreenCount] = blockShapes[h][w]
+          blocksOnScreen[blocksOnScreenCount]["h"] = h
+          blocksOnScreen[blocksOnScreenCount]["w"] = w
           blocksOnScreenCount = blocksOnScreenCount + 1
         ElseIf blockLeft > gw + blockSize Then
           Goto endWidthCheck
@@ -175,9 +237,10 @@ EndSub
 Sub BlockCheck
   ' Проверяваме дали играча докосва някакъв блок
   For i = 1 To blocksOnScreenCount
-    blockLeft = Shapes.GetLeft(blocksOnScreen[i])
+    blockShapeOnScreen = blockShapes[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]]
+    blockLeft = Shapes.GetLeft(blockShapeOnScreen)
     blockRight = blockLeft + blockSize
-    blockTop = Shapes.GetTop(blocksOnScreen[i])
+    blockTop = Shapes.GetTop(blockShapeOnScreen)
     blockBottom = blockTop + blockSize
     ' Провери дали блока се удря
     If playerRight >= blockLeft And playerLeft <= blockRight And playerTop - velocity <= blockBottom And playerBottom + 1 >= blockTop Then
@@ -188,7 +251,7 @@ Sub BlockCheck
         playerRight = playerLeft + playerWidth
         hitBlockLeft = 1
       ' Проверка дали блока се удря от ляво
-      ElseIf playerRight >= blockLeft And playerRight < blockLeft + moveSpeed And playerTop < blockBottom And playerBottom > blockTop Then
+      ElseIf playerRight >= blockLeft And playerRight < blockLeft + moveSpeed And playerTop < blockBottom - 1 And playerBottom > blockTop Then
         Shapes.Move(player, blockLeft - playerWidth, playerTop)
         playerLeft = Shapes.GetLeft(player)
         playerRight = playerLeft + playerWidth
@@ -196,6 +259,20 @@ Sub BlockCheck
       EndIf
       ' Провери дали блока се удря от долу
       If playerTop > blockBottom - moveSpeed * 2 And playerTop - 1 < blockBottom And playerRight > blockLeft And playerLeft < blockRight Then
+        If blocks[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]] = "p" And keyboard["Up"] = 1 Then
+          blocks[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]] = "q"
+          Shapes.Remove(blockShapes[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]])
+          blockShapes[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]] = Shapes.AddImage(tiles["q"])
+          Shapes.Move(blockShapes[blocksOnScreen[i]["h"]][blocksOnScreen[i]["w"]], blockLeft, blockTop)
+          otherSprites[otherSpritesCount]["Shape"] = Shapes.AddImage(mushroom)
+          otherSprites[otherSpritesCount]["Type"] = 1
+          otherSprites[otherSpritesCount]["Velocity"] = 0
+          otherSprites[otherSpritesCount]["Alive"] = 1
+          otherSprites[otherSpritesCount]["Facing"] = 1
+          otherSprites[otherSpritesCount]["Appearing"] = blockSize
+          Shapes.Move(otherSprites[otherSpritesCount]["Shape"], blockLeft, blockTop)
+          otherSpritesCount = otherSpritesCount + 1
+        EndIf
         Shapes.Move(player, playerLeft, blockBottom - 1)
         playerTop = Shapes.GetTop(player)
         playerBottom = playerTop + playerHeight
@@ -240,12 +317,20 @@ Sub MovePlayer
       If lastPlayerSprite <> 6 Then
         lastPlayerSprite = 6
         Shapes.Remove(player)
-        player = Shapes.AddImage(playerInAirLeft)
+        If playerEmpowered = 1 Then
+          player = Shapes.AddImage(playerEmpoweredInAirLeft)
+        Else
+          player = Shapes.AddImage(playerInAirLeft)
+        EndIf
       EndIf
     ElseIf lastPlayerSprite <> 5 Then
       lastPlayerSprite = 5
       Shapes.Remove(player)
-      player = Shapes.AddImage(playerInAirRight)
+      If playerEmpowered = 1 Then
+        player = Shapes.AddImage(playerEmpoweredInAirRight)
+      Else
+        player = Shapes.AddImage(playerInAirRight)
+      EndIf
     EndIf
     Shapes.Move(player, playerLeft, playerTop - velocity)
     playerTop = Shapes.GetTop(player)
@@ -276,10 +361,18 @@ Sub MovePlayer
       lastPlayerSprite = 3
       Shapes.Remove(player)
       If walkingAnimationType = 0 Then
-        player = Shapes.AddImage(playerWalkingRight)
+        If playerEmpowered = 1 Then
+          player = Shapes.AddImage(playerEmpoweredWalkingRight)
+        Else
+          player = Shapes.AddImage(playerWalkingRight)
+        EndIf
         walkingAnimationType = 1
       Else
-        player = Shapes.AddImage(playerWalkingRight2)
+        If playerEmpowered = 1 Then
+          player = Shapes.AddImage(playerEmpoweredWalkingRight2)
+        Else
+          player = Shapes.AddImage(playerWalkingRight2)
+        EndIf
         walkingAnimationType = 0
       EndIf
       Shapes.Move(player, playerLeft, playerTop)
@@ -301,10 +394,18 @@ Sub MovePlayer
       lastPlayerSprite = 4
       Shapes.Remove(player)
       If walkingAnimationType = 0 Then
-        player = Shapes.AddImage(playerWalkingLeft)
+        If playerEmpowered = 1 Then
+          player = Shapes.AddImage(playerEmpoweredWalkingLeft)
+        Else
+          player = Shapes.AddImage(playerWalkingLeft)
+        EndIf
         walkingAnimationType = 1
       Else
-        player = Shapes.AddImage(playerWalkingLeft2)
+        If playerEmpowered = 1 Then
+          player = Shapes.AddImage(playerEmpoweredWalkingLeft2)
+        Else
+          player = Shapes.AddImage(playerWalkingLeft2)
+        EndIf
         walkingAnimationType = 0
       EndIf
       Shapes.Move(player, playerLeft, playerTop)
@@ -337,9 +438,19 @@ Sub MoveLevelRight
     EndFor
     ' Премести всички противници
     For i = 1 To Array.GetItemCount(enemyShapes)
-      enemyLeft = Shapes.GetLeft(enemyShapes[i])
-      enemyTop = Shapes.GetTop(enemyShapes[i])
-      Shapes.Move(enemyShapes[i], enemyLeft - movmentExceleration, enemyTop)
+      If enemies[i]["alive"] = 1 Then
+        enemyLeft = Shapes.GetLeft(enemyShapes[i])
+        enemyTop = Shapes.GetTop(enemyShapes[i])
+        Shapes.Move(enemyShapes[i], enemyLeft - movmentExceleration, enemyTop)
+      EndIf
+    EndFor
+    ' Премести останалите sprite-ове
+    For i = 1 To Array.GetItemCount(otherSprites)
+      If otherSprites[i]["Alive"] = 1 Then
+        spriteLeft = Shapes.GetLeft(otherSprites[i]["Shape"])
+        spriteTop = Shapes.GetTop(otherSprites[i]["Shape"])
+        Shapes.Move(otherSprites[i]["Shape"], spriteLeft - movmentExceleration, spriteTop)
+      EndIf
     EndFor
     position = position + movmentExceleration
   Else
@@ -370,6 +481,14 @@ Sub MoveLevelLeft
       enemyLeft = Shapes.GetLeft(enemyShapes[i])
       enemyTop = Shapes.GetTop(enemyShapes[i])
       Shapes.Move(enemyShapes[i], enemyLeft + movmentExceleration, enemyTop)
+    EndFor
+    ' Премести останалите sprite-ове
+    For i = 1 To Array.GetItemCount(otherSprites)
+      If otherSprites[i]["Alive"] = 1 Then
+        spriteLeft = Shapes.GetLeft(otherSprites[i]["Shape"])
+        spriteTop = Shapes.GetTop(otherSprites[i]["Shape"])
+        Shapes.Move(otherSprites[i]["Shape"], spriteLeft + movmentExceleration, spriteTop)
+      EndIf
     EndFor
     position = position - movmentExceleration
   Else
@@ -402,9 +521,10 @@ Sub MoveEnemies
     
     ' Проверяваме дали противника докосва някакъв блок
     For r = 1 To blocksOnScreenCount
-      blockLeft = Shapes.GetLeft(blocksOnScreen[r])
+      blockShapeOnScreen = blockShapes[blocksOnScreen[r]["h"]][blocksOnScreen[r]["w"]]
+      blockLeft = Shapes.GetLeft(blockShapeOnScreen)
       blockRight = blockLeft + blockSize
-      blockTop = Shapes.GetTop(blocksOnScreen[r])
+      blockTop = Shapes.GetTop(blockShapeOnScreen)
       blockBottom = blockTop + blockSize
       ' Провери дали блока се удря
       If enemyRight >= blockLeft And enemyLeft <= blockRight And enemyTop <= blockBottom And enemyBottom + 1 > blockTop Then
@@ -450,6 +570,75 @@ Sub MoveEnemies
   EndFor
 EndSub
 
+Sub MoveOtherSprites
+  For i = 1 To Array.GetItemCount(otherSprites)
+    If otherSprites[i]["Alive"] = 0 Then
+      Goto endOfSpriteLoop
+    EndIf
+    
+    spriteLeft = Shapes.GetLeft(otherSprites[i]["Shape"])
+    spriteRight = spriteLeft + blockSize
+    
+    If spriteRight < 0 Or spriteLeft > gw Then
+      Goto endOfSpriteLoop
+    EndIf
+    
+    spriteTop = Shapes.GetTop(otherSprites[i]["Shape"])
+    spriteBottom = spriteTop + blockSize
+    
+    If otherSprites[i]["Appearing"] <> 0 Then
+      otherSprites[i]["Appearing"] = otherSprites[i]["Appearing"] - 2
+      Shapes.Move(otherSprites[i]["Shape"], spriteLeft, spriteTop - 2)
+      Goto endOfSpriteLoop
+    EndIf
+    
+    If spriteTop >= Array.GetItemCount(blocks) * blockSize Then
+      Shapes.Remove(otherSprites[i]["Shape"])
+      otherSprites[i]["Alive"] = 0
+    EndIf
+    
+    spriteHitBlockBottom = 0
+    
+    ' Проверяваме дали противника докосва някакъв блок
+    For r = 1 To blocksOnScreenCount
+      blockShapeOnScreen = blockShapes[blocksOnScreen[r]["h"]][blocksOnScreen[r]["w"]]
+      blockLeft = Shapes.GetLeft(blockShapeOnScreen)
+      blockRight = blockLeft + blockSize
+      blockTop = Shapes.GetTop(blockShapeOnScreen)
+      blockBottom = blockTop + blockSize
+      ' Провери дали блока се удря
+      If spriteRight >= blockLeft And spriteLeft <= blockRight And spriteTop <= blockBottom And spriteBottom + 1 > blockTop Then
+        ' Проверка дали блока се удря от дясно
+        If ((spriteRight >= blockLeft And spriteRight < blockLeft + 5) Or (spriteLeft > blockRight - 5 And spriteLeft <= blockRight)) And spriteTop + 1 < blockBottom And spriteBottom > blockTop Then
+          If otherSprites[i]["Facing"] = 1 Then
+            otherSprites[i]["Facing"] = 0
+          Else
+            otherSprites[i]["Facing"] = 1
+          EndIf
+        EndIf
+        
+        ' Проверка дали блока се удря от горе
+        If spriteBottom > blockTop - 1 And spriteBottom < blockTop + 1 And spriteRight > blockLeft And spriteLeft < blockRight Then
+          otherSprites[i]["Velocity"] = 0
+          spriteHitBlockBottom = 1
+        EndIf
+      EndIf
+    EndFor
+    
+    If spriteHitBlockBottom = 0 Then
+      otherSprites[i]["Velocity"] = -2
+    EndIf
+    
+    If otherSprites[i]["Facing"] = 1 Then
+      Shapes.Move(otherSprites[i]["Shape"], spriteLeft + 1, spriteTop - otherSprites[i]["Velocity"])
+    Else
+      Shapes.Move(otherSprites[i]["Shape"], spriteLeft - 1, spriteTop - otherSprites[i]["Velocity"])
+    EndIf
+    
+    endOfSpriteLoop:
+  EndFor
+EndSub
+
 Sub SetInAir
   inAir = 1
   
@@ -460,7 +649,11 @@ Sub SetInAir
       playerLeft = Shapes.GetLeft(player)
       playerTop = Shapes.GetTop(player)
       Shapes.Remove(player)
-      player = Shapes.AddImage(playerInAirLeft)
+      If playerEmpowered = 1 Then
+        player = Shapes.AddImage(playerEmpoweredInAirLeft)
+      Else
+        player = Shapes.AddImage(playerInAirLeft)
+      EndIf
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
   ElseIf lastPlayerSprite <> 5 Then
@@ -468,7 +661,11 @@ Sub SetInAir
     playerLeft = Shapes.GetLeft(player)
     playerTop = Shapes.GetTop(player)
     Shapes.Remove(player)
-    player = Shapes.AddImage(playerInAirRight)
+    If playerEmpowered = 1 Then
+      player = Shapes.AddImage(playerEmpoweredInAirRight)
+    Else
+      player = Shapes.AddImage(playerInAirRight)
+    EndIf
     Shapes.Move(player, playerLeft, playerTop)
   EndIf
 EndSub
@@ -483,7 +680,11 @@ Sub SetNotInAir
       playerLeft = Shapes.GetLeft(player)
       playerTop = Shapes.GetTop(player)
       Shapes.Remove(player)
-      player = Shapes.AddImage(playerIdleRight)
+      If playerEmpowered = 1 Then
+        player = Shapes.AddImage(playerEmpoweredIdleRight)
+      Else
+        player = Shapes.AddImage(playerIdleRight)
+      EndIf
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
   ElseIf keyboard["Left"] = 0 And lastMovedX = 2 Then
@@ -492,7 +693,11 @@ Sub SetNotInAir
       playerLeft = Shapes.GetLeft(player)
       playerTop = Shapes.GetTop(player)
       Shapes.Remove(player)
-      player = Shapes.AddImage(playerIdleLeft)
+      If playerEmpowered = 1 Then
+        player = Shapes.AddImage(playerEmpoweredIdleLeft)
+      Else
+        player = Shapes.AddImage(playerIdleLeft)
+      EndIf
       Shapes.Move(player, playerLeft, playerTop)
     EndIf
   EndIf
@@ -630,11 +835,15 @@ EndSub
 Sub LoadLevelInfo
   GraphicsWindow.BrushColor = "White"
   GraphicsWindow.Clear()
+  otherSpritesCount = 1
+  otherSprites = ""
   blocks = ""
   enemies = ""
   enemyShapes = ""
   blockShapes = ""
   player = ""
+  playerEmpowered = 0
+  playerInvincible = 0
   timeEnded = 0
   restartGame = 0
   cameraLeftMax = 0
