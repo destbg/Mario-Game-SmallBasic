@@ -252,7 +252,12 @@ Sub MovePlayer
     playerBottom = playerTop + playerHeight
     
     If velocity >= -moveSpeed Then
-      velocity = velocity - 0.5
+      ' Ако продълциш да натискаш бутона за нагоре ще направиш по голям скок
+      If keyboard["Up"] = 1 Then
+        velocity = velocity - 0.5
+      Else
+        velocity = velocity - 1
+      EndIf
     EndIf
   EndIf
   
