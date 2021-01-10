@@ -1,5 +1,5 @@
 blockSize = 64
-heightMultiplier = 10
+heightMultiplier = 12
 widthMultiplier = 15
 invincibilityFrames = 300
 
