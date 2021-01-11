@@ -1,3 +1,7 @@
+' От Nikolai Kostadinov, date: 11-01-2021
+' Линк към кода XBZ605 (не го опитвай без картинките)
+
+' Глобални variables
 blockSize = 64
 heightMultiplier = 12
 widthMultiplier = 15
@@ -7,6 +11,7 @@ levelFolderPath = Program.Directory + "\levels\"
 moveSpeed = 13
 exceleration = 16
 
+' Прозореца на играта
 GraphicsWindow.Width = blockSize * widthMultiplier - 10
 GraphicsWindow.Height = blockSize * heightMultiplier - 10
 GraphicsWindow.CanResize = "False"
@@ -16,6 +21,7 @@ GraphicsWindow.KeyUp = OnKeyUp
 gh = GraphicsWindow.Height
 gw = GraphicsWindow.Width
 
+' Spites
 playerEmpoweredIdleRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered idle right.png")
 playerEmpoweredIdleLeft = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered idle left.png")
 playerEmpoweredWalkingRight = ImageList.LoadImage(Program.Directory + "\mario sprites\Empowered walking right.png")
